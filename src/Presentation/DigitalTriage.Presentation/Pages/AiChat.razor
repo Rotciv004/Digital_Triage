@@ -1,0 +1,231 @@
+@page "/ai-triage"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using DigitalTriage.Presentation.Common.Helpers
+@using DigitalTriage.Application.Contracts.Services
+@using DigitalTriage.Domain.Entities
+@using System.Security.Claims
+@inject IPatientService PatientService
+@inject IFamilyMedicService FamilyMedicService
+@inject IEmailService EmailService
+@inject IPatientIssueService PatientIssueService
+@inject IAuthHelper Auth
+@inject IHttpContextAccessor Http
+@inject ILogger<AiChat> Logger
+
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="page-header">
+                <h2 class="fw-bold mb-2">
+                    <i class="bi bi-robot me-2 text-info"></i>AI Triage Assistant
+                </h2>
+                <p class="text-muted">Get instant medical triage recommendations</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        <strong>Preview Mode:</strong> AI is offline - placeholder UI only.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0" style="height: 500px;">
+                <div class="card-body p-4 d-flex flex-column">
+                    <h5 class="card-title mb-4">
+                        <i class="bi bi-chat-dots me-2 text-info"></i>Chat with AI Assistant
+                    </h5>
+                    
+                    <div class="chat-container flex-grow-1 overflow-auto mb-3 bg-light rounded p-3">
+                        <div class="d-flex mb-3">
+                            <div class="flex-shrink-0">
+                                <div class="avatar bg-info text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                    <i class="bi bi-robot"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <div class="chat-bubble bg-white rounded-3 p-3 shadow-sm">
+                                    <strong class="text-info">AI Assistant</strong>
+                                    <p class="mb-0 mt-2">Bun venit! Descrieți simptomele tale pentru a primi recomandări de triaj medical.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-end mb-3">
+                            <div class="flex-grow-1 me-3 text-end">
+                                <div class="chat-bubble bg-info text-white rounded-3 p-3">
+                                    <strong>You</strong>
+                                    <p class="mb-0 mt-2">Durere de cap și febră ușoară.</p>
+                                </div>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                    <i class="bi bi-person"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <input type="text" class="form-control form-control-lg" placeholder="Scrieți un mesaj..." disabled />
+                        <button class="btn btn-info btn-lg" disabled>
+                            <i class="bi bi-send"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold mb-3">
+                        <i class="bi bi-info-circle me-2 text-info"></i>How it works
+                    </h6>
+                    <ul class="list-unstyled">
+                        <li class="mb-3">
+                            <i class="bi bi-1-circle text-info me-2"></i>
+                            Describe your symptoms
+                        </li>
+                        <li class="mb-3">
+                            <i class="bi bi-2-circle text-info me-2"></i>
+                            AI analyzes the information
+                        </li>
+                        <li class="mb-0">
+                            <i class="bi bi-3-circle text-info me-2"></i>
+                            Receive triage recommendations
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 border-info border-3">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold mb-3">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Important Notice
+                    </h6>
+                    <p class="small mb-0">AI triage is a preliminary assessment tool and should not replace professional medical advice. For emergencies, call your local emergency number.</p>
+                </div>
+            </div>
+
+            @if (hasFamilyMedic && !isEmergency)
+            {
+                <div class="card shadow-sm border-0 border-success border-3 mt-3">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold mb-3">
+                            <i class="bi bi-envelope-paper me-2 text-success"></i>Send to Family Medic
+                        </h6>
+                        <p class="small mb-3">Your medical issue is not an emergency. You can send this information to your family medic for review.</p>
+                        <button class="btn btn-success btn-sm w-100" @onclick="HandleSendToFamilyMedic" disabled="@isSendingToFamilyMedic">
+                            @if (isSendingToFamilyMedic)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-send me-2"></i>
+                            }
+                            Send to Family Medic
+                        </button>
+                        @if (!string.IsNullOrEmpty(sendToFamilyMedicError))
+                        {
+                            <div class="alert alert-danger py-2 mt-2 mb-0">
+                                <i class="bi bi-exclamation-circle me-1"></i>@sendToFamilyMedicError
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(sendToFamilyMedicSuccess))
+                        {
+                            <div class="alert alert-success py-2 mt-2 mb-0">
+                                <i class="bi bi-check-circle me-1"></i>@sendToFamilyMedicSuccess
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private Patient? patient;
+    private bool hasFamilyMedic;
+    private bool isEmergency = false; // In real implementation, this would be determined by AI
+    private bool isSendingToFamilyMedic;
+    private string? sendToFamilyMedicError;
+    private string? sendToFamilyMedicSuccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = Http.HttpContext?.User ?? new ClaimsPrincipal(new ClaimsIdentity());
+        var userId = Auth.GetUserId(user);
+
+        if (userId.HasValue)
+        {
+            patient = await PatientService.GetByIdAsync(userId.Value);
+            hasFamilyMedic = patient?.FamilyMedicDoctorId.HasValue == true;
+        }
+    }
+
+    private async Task HandleSendToFamilyMedic()
+    {
+        if (patient == null || string.IsNullOrEmpty(patient.FamilyMedicEmail))
+        {
+            sendToFamilyMedicError = "No family medic assigned.";
+            return;
+        }
+
+        isSendingToFamilyMedic = true;
+        sendToFamilyMedicError = null;
+        sendToFamilyMedicSuccess = null;
+
+        try
+        {
+            // Create a patient issue from the AI conversation
+            // In a real implementation, this would come from the actual AI conversation
+            var issue = await PatientIssueService.CreateAsync(
+                patient.Id,
+                "Medical Consultation Request",
+                "Patient requested consultation after AI triage assessment.");
+
+            // Get Outlook token (in real implementation, this would be obtained via OAuth2)
+            var outlookToken = await FamilyMedicService.GetOutlookTokenAsync(patient.Id);
+            
+            if (string.IsNullOrEmpty(outlookToken))
+            {
+                sendToFamilyMedicError = "Please connect your Outlook account first. Go to Medical Information page to set up Outlook integration.";
+                return;
+            }
+
+            // Send email via Outlook
+            var success = await EmailService.SendProblemToFamilyMedicAsync(
+                patient.Email,
+                patient.FamilyMedicEmail,
+                outlookToken,
+                issue.Title ?? "Medical Consultation Request",
+                issue.Description ?? "Patient requested consultation after AI triage assessment.",
+                issue.ProblemType,
+                issue.EmergencyGrade.HasValue ? (int)issue.EmergencyGrade.Value : null);
+
+            if (success)
+            {
+                sendToFamilyMedicSuccess = "Medical issue sent to your family medic successfully.";
+            }
+            else
+            {
+                sendToFamilyMedicError = "Failed to send email. Please try again or contact your family medic directly.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error sending to family medic");
+            sendToFamilyMedicError = "An error occurred while sending to your family medic. Please try again.";
+        }
+        finally
+        {
+            isSendingToFamilyMedic = false;
+        }
+    }
+}

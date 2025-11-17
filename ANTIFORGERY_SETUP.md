@@ -93,7 +93,7 @@ Create `Controllers/AntiforgeryController.cs`:
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 
-namespace DigitalTriageApp.Controllers
+namespace DigitalTriage.Presentation.Controllers
 {
     [ApiController]
     [Route("antiforgery")]
@@ -129,7 +129,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http;
 using Microsoft.JSInterop;
 
-namespace DigitalTriageApp.Helpers
+namespace DigitalTriage.Presentation.Common.Helpers
 {
     public class AntiforgeryHelper
     {
@@ -252,7 +252,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace DigitalTriageApp.Controllers
+namespace DigitalTriage.Presentation.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -341,10 +341,10 @@ namespace DigitalTriageApp.Controllers
 
 ## Summary
 
-✅ Antiforgery is configured with custom header `X-CSRF-TOKEN`
-✅ JavaScript helpers are available via `BlazorAntiforgery` object
-✅ AntiforgeryHelper class provides server-side token access
-✅ API controllers validate tokens with `[ValidateAntiForgeryToken]`
-✅ EditForms work automatically with `<AntiforgeryToken />`
+Antiforgery is configured with custom header `X-CSRF-TOKEN`
+JavaScript helpers are available via `BlazorAntiforgery` object
+AntiforgeryHelper class provides server-side token access
+API controllers validate tokens with `[ValidateAntiForgeryToken]`
+EditForms work automatically with `<AntiforgeryToken />`
 
 Your application is now protected against CSRF attacks!
