@@ -1,0 +1,704 @@
+@page "/statistics"
+@attribute [Authorize(Roles="Doctor")]
+@using DigitalTriage.Application.Contracts.Services
+@using DigitalTriage.Domain.Entities
+@using DigitalTriage.Presentation.Common.Helpers
+@using System.Security.Claims
+@using System.Text.Json
+@inject HttpClient Http
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IAuthHelper Auth
+@inject NavigationManager Nav
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Statistics - Medical Triage</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="page-header">
+                <h2 class="fw-bold mb-2">
+                    <i class="bi bi-bar-chart-fill me-2 text-primary"></i>Statistics Dashboard
+                </h2>
+                <p class="text-muted">View aggregated statistics for patients with active medical issues</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Panel -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-funnel me-2"></i>Filters
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <!-- Location Level Toggle -->
+                <div class="col-md-12">
+                    <label class="form-label fw-semibold">Location Level</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="locationLevel" id="levelCountry" value="country" checked="@(selectedLevel == "country")" @onchange="@(() => OnLevelChanged("country"))" />
+                        <label class="btn btn-outline-primary" for="levelCountry">Country</label>
+                        
+                        <input type="radio" class="btn-check" name="locationLevel" id="levelCounty" value="county" checked="@(selectedLevel == "county")" @onchange="@(() => OnLevelChanged("county"))" />
+                        <label class="btn btn-outline-primary" for="levelCounty">County</label>
+                        
+                        <input type="radio" class="btn-check" name="locationLevel" id="levelCity" value="city" checked="@(selectedLevel == "city")" @onchange="@(() => OnLevelChanged("city"))" />
+                        <label class="btn btn-outline-primary" for="levelCity">City</label>
+                    </div>
+                </div>
+
+                <!-- Location Dropdown -->
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Location</label>
+                    <select class="form-select" value="@SelectedLocationIdString" @onchange="OnLocationChanged" disabled="@(isLoadingFilters || !locationOptions.Any())">
+                        <option value="">All locations</option>
+                        @foreach (var loc in locationOptions)
+                        {
+                            <option value="@loc.Id">@loc.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Hospital Dropdown -->
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Hospital <span class="text-muted">(Optional)</span></label>
+                    <select class="form-select" value="@SelectedHospitalIdString" @onchange="OnHospitalChanged" disabled="@(isLoadingFilters || !hospitalOptions.Any())">
+                        <option value="">All hospitals</option>
+                        @foreach (var hospital in hospitalOptions)
+                        {
+                            <option value="@hospital.Id">@hospital.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Time Range -->
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Time Range</label>
+                    <select class="form-select" @bind="selectedTimeRange" @bind:event="onchange">
+                        <option value="7days">Last 7 days</option>
+                        <option value="30days">Last 30 days</option>
+                        <option value="custom">Custom range</option>
+                    </select>
+                </div>
+
+                <!-- Custom Date Range -->
+                @if (selectedTimeRange == "custom")
+                {
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">From Date</label>
+                        <input type="date" class="form-control" @bind="customFromDate" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">To Date</label>
+                        <input type="date" class="form-control" @bind="customToDate" />
+                    </div>
+                }
+
+                <!-- Problem Types Multi-Select -->
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Problem Types</label>
+                    <select class="form-select" multiple size="4" @onchange="OnProblemTypesChanged" @ref="problemTypesSelectElement" disabled="@(isLoadingFilters || !problemTypeOptions.Any())">
+                        @foreach (var type in problemTypeOptions)
+                        {
+                            <option value="@type" selected="@selectedProblemTypes.Contains(type)">@type</option>
+                        }
+                    </select>
+                    <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                </div>
+
+                <!-- Emergency Grades Multi-Select -->
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Emergency Grades</label>
+                    <select class="form-select" multiple size="4" @onchange="OnEmergencyGradesChanged" @ref="emergencyGradesSelectElement" disabled="@(isLoadingFilters)">
+                        @foreach (var grade in Enum.GetValues<EsiLevel>())
+                        {
+                            <option value="@grade.ToString()" selected="@selectedEmergencyGrades.Contains(grade)">@grade</option>
+                        }
+                    </select>
+                    <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="col-12">
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" @onclick="ApplyFilters" disabled="@isLoading">
+                            <i class="bi bi-search me-2"></i>Apply Filters
+                        </button>
+                        <button class="btn btn-outline-secondary" @onclick="ResetFilters" disabled="@isLoading">
+                            <i class="bi bi-arrow-counterclockwise me-2"></i>Reset
+                        </button>
+                        <button class="btn btn-success" @onclick="ExportData" disabled="@(isLoading || summary == null)">
+                            <i class="bi bi-download me-2"></i>Export
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading statistics...</span>
+            </div>
+        </div>
+    }
+    else if (summary != null)
+    {
+        <!-- KPI Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm bg-gradient bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <i class="bi bi-exclamation-triangle fs-1"></i>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <div class="fw-bold fs-4">@summary.TotalActiveIssues</div>
+                                <div class="small">Total Active Issues</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm bg-gradient bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <i class="bi bi-people fs-1"></i>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <div class="fw-bold fs-4">@summary.UniquePatientsWithActiveIssues</div>
+                                <div class="small">Unique Patients</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm bg-gradient bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <i class="bi bi-hospital fs-1"></i>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <div class="fw-bold fs-4">@summary.HospitalsIncluded</div>
+                                <div class="small">Hospitals Included</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="row g-3 mb-4">
+            <!-- Distribution by Severity -->
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h6 class="mb-0">
+                            <i class="bi bi-pie-chart me-2"></i>Distribution by Severity
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var kvp in summary.DistributionBySeverity.OrderByDescending(x => x.Value))
+                        {
+                            var percentage = summary.TotalActiveIssues > 0 
+                                ? (kvp.Value * 100.0 / summary.TotalActiveIssues) 
+                                : 0;
+                            var color = kvp.Key switch
+                            {
+                                "Critical" => "danger",
+                                "High" => "warning",
+                                "Moderate" => "info",
+                                "Low" => "success",
+                                _ => "secondary"
+                            };
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="fw-semibold">@kvp.Key</span>
+                                    <span class="text-muted">@kvp.Value (@percentage:F1%)</span>
+                                </div>
+                                <div class="progress" style="height: 25px;">
+                                    <div class="progress-bar bg-@color" role="progressbar" 
+                                         style="width: @percentage%" 
+                                         aria-valuenow="@kvp.Value" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="@summary.TotalActiveIssues">
+                                        @kvp.Value
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Distribution by Type -->
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0">
+                            <i class="bi bi-bar-chart me-2"></i>Distribution by Problem Type
+                        </h6>
+                    </div>
+                    <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                        @if (summary.DistributionByType.Any())
+                        {
+                            @foreach (var kvp in summary.DistributionByType.OrderByDescending(x => x.Value))
+                            {
+                                var percentage = summary.TotalActiveIssues > 0 
+                                    ? (kvp.Value * 100.0 / summary.TotalActiveIssues) 
+                                    : 0;
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="fw-semibold">@kvp.Key</span>
+                                        <span class="text-muted">@kvp.Value (@percentage:F1%)</span>
+                                    </div>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-primary" role="progressbar" 
+                                             style="width: @percentage%" 
+                                             aria-valuenow="@kvp.Value" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="@summary.TotalActiveIssues">
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted text-center py-3">No problem types available</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Heatmap: Type × Severity Matrix -->
+        @if (summary.TypeSeverityMatrix.Any())
+        {
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h6 class="mb-0">
+                        <i class="bi bi-grid-3x3-gap me-2"></i>Type × Severity Matrix
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Problem Type</th>
+                                    <th class="text-center bg-success text-white">Low</th>
+                                    <th class="text-center bg-info text-white">Moderate</th>
+                                    <th class="text-center bg-warning text-dark">High</th>
+                                    <th class="text-center bg-danger text-white">Critical</th>
+                                    <th class="text-center">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var type in summary.TypeSeverityMatrix.OrderBy(x => x.Key))
+                                {
+                                    var total = type.Value.Values.Sum();
+                                    <tr>
+                                        <td class="fw-semibold">@type.Key</td>
+                                        <td class="text-center">@(type.Value.TryGetValue("Low", out var low) ? low : 0)</td>
+                                        <td class="text-center">@(type.Value.TryGetValue("Moderate", out var mod) ? mod : 0)</td>
+                                        <td class="text-center">@(type.Value.TryGetValue("High", out var high) ? high : 0)</td>
+                                        <td class="text-center">@(type.Value.TryGetValue("Critical", out var crit) ? crit : 0)</td>
+                                        <td class="text-center fw-bold">@total</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Top Hospitals Table -->
+        @if (summary.TopHospitals.Any())
+        {
+            <div class="card shadow-sm">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0">
+                        <i class="bi bi-trophy me-2"></i>Top Hospitals by Active Issues
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Hospital Name</th>
+                                    <th class="text-center">Active Issues</th>
+                                    <th class="text-center">Unique Patients</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    var rank = 1;
+                                }
+                                @foreach (var hospital in summary.TopHospitals)
+                                {
+                                    <tr>
+                                        <td class="fw-bold">#@rank</td>
+                                        <td>@hospital.Name</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-primary">@hospital.ActiveIssuesCount</span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-info">@hospital.UniquePatientsCount</span>
+                                        </td>
+                                    </tr>
+                                    rank++;
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else if (!isLoading && summary == null && hasLoadedOnce)
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>No data available</strong> for the selected filters. This could mean:
+            <ul class="mb-0 mt-2">
+                <li>There are no active patient issues in your authorized hospitals</li>
+                <li>The selected filters don't match any records</li>
+                <li>Try removing some filters or selecting different criteria</li>
+            </ul>
+        </div>
+    }
+    else if (!isLoading && !hasLoadedOnce)
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Click "Apply Filters" to load statistics.
+        </div>
+    }
+</div>
+
+@code {
+    private StatisticsFiltersDto? filters;
+    private StatisticsSummaryDto? summary;
+    private bool isLoading = false;
+    private bool isLoadingFilters = true;
+    private bool hasLoadedOnce = false;
+
+    // Filter state
+    private string selectedLevel = "country";
+    private int? selectedLocationId;
+    private int? selectedHospitalId;
+    private string selectedTimeRange = "7days";
+    private DateTime? customFromDate;
+    private DateTime? customToDate;
+    private List<string> selectedProblemTypes = new();
+    private List<EsiLevel> selectedEmergencyGrades = new();
+
+    // Options
+    private List<LocationOptionDto> locationOptions = new();
+    private List<HospitalOptionDto> hospitalOptions = new();
+    private List<string> problemTypeOptions = new();
+
+    private int? doctorUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var principal = HttpContextAccessor.HttpContext?.User ?? new ClaimsPrincipal(new ClaimsIdentity());
+        doctorUserId = Auth.GetUserId(principal);
+
+        if (doctorUserId.HasValue)
+        {
+            await LoadFiltersAsync();
+            await ApplyFilters();
+        }
+    }
+
+    private async Task LoadFiltersAsync()
+    {
+        isLoadingFilters = true;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<StatisticsFiltersDto>("/api/stats/filters");
+            if (response != null)
+            {
+                filters = response;
+                UpdateLocationOptions();
+                hospitalOptions = response.Hospitals.ToList();
+                problemTypeOptions = response.ProblemTypes.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading filters: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+        finally
+        {
+            isLoadingFilters = false;
+            StateHasChanged();
+        }
+    }
+
+    private void UpdateLocationOptions()
+    {
+        if (filters == null) return;
+
+        locationOptions = selectedLevel.ToLowerInvariant() switch
+        {
+            "country" => filters.Countries.ToList(),
+            "county" => filters.Counties.ToList(),
+            "city" => filters.Cities.ToList(),
+            _ => new List<LocationOptionDto>()
+        };
+        selectedLocationId = null; // Reset when level changes
+    }
+
+    private string SelectedLocationIdString => selectedLocationId?.ToString() ?? string.Empty;
+    private string SelectedHospitalIdString => selectedHospitalId?.ToString() ?? string.Empty;
+
+    private void OnLevelChanged(string level)
+    {
+        selectedLevel = level;
+        UpdateLocationOptions();
+        StateHasChanged();
+    }
+
+    private void OnLocationChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            selectedLocationId = null;
+        }
+        else if (int.TryParse(value, out var id))
+        {
+            selectedLocationId = id;
+        }
+        else
+        {
+            selectedLocationId = null;
+        }
+    }
+
+    private void OnHospitalChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            selectedHospitalId = null;
+        }
+        else if (int.TryParse(value, out var id))
+        {
+            selectedHospitalId = id;
+        }
+        else
+        {
+            selectedHospitalId = null;
+        }
+    }
+
+    private async Task ApplyFilters()
+    {
+        if (!doctorUserId.HasValue) return;
+
+        isLoading = true;
+        hasLoadedOnce = true;
+
+        try
+        {
+            var query = BuildQuery();
+            var url = $"/api/stats/summary{query}";
+            var response = await Http.GetFromJsonAsync<StatisticsSummaryDto>(url);
+            summary = response;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading statistics: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            summary = null;
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string BuildQuery()
+    {
+        var queryParams = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(selectedLevel) && selectedLocationId.HasValue)
+        {
+            queryParams.Add($"level={Uri.EscapeDataString(selectedLevel)}");
+            queryParams.Add($"locationId={selectedLocationId.Value}");
+        }
+
+        if (selectedHospitalId.HasValue)
+        {
+            queryParams.Add($"hospitalId={selectedHospitalId.Value}");
+        }
+
+        var (fromDate, toDate) = GetDateRange();
+        if (fromDate.HasValue)
+        {
+            queryParams.Add($"fromDate={fromDate.Value:yyyy-MM-dd}");
+        }
+        if (toDate.HasValue)
+        {
+            queryParams.Add($"toDate={toDate.Value:yyyy-MM-dd}");
+        }
+
+        if (selectedProblemTypes.Any())
+        {
+            foreach (var type in selectedProblemTypes)
+            {
+                queryParams.Add($"types={Uri.EscapeDataString(type)}");
+            }
+        }
+
+        if (selectedEmergencyGrades.Any())
+        {
+            foreach (var grade in selectedEmergencyGrades)
+            {
+                queryParams.Add($"severities={grade}");
+            }
+        }
+
+        return queryParams.Any() ? "?" + string.Join("&", queryParams) : "";
+    }
+
+    private (DateTime?, DateTime?) GetDateRange()
+    {
+        return selectedTimeRange switch
+        {
+            "7days" => (DateTime.UtcNow.AddDays(-7), DateTime.UtcNow),
+            "30days" => (DateTime.UtcNow.AddDays(-30), DateTime.UtcNow),
+            "custom" => (customFromDate, customToDate),
+            _ => (null, null)
+        };
+    }
+
+    private ElementReference problemTypesSelectElement;
+    private ElementReference emergencyGradesSelectElement;
+
+    private async Task OnProblemTypesChanged(ChangeEventArgs e)
+    {
+        selectedProblemTypes.Clear();
+        try
+        {
+            var selectedValues = await JSRuntime.InvokeAsync<string[]>("getSelectedOptions", problemTypesSelectElement);
+            if (selectedValues != null)
+            {
+                selectedProblemTypes.AddRange(selectedValues);
+            }
+        }
+        catch
+        {
+            // Fallback if JS interop fails
+            if (e.Value != null)
+            {
+                var value = e.Value.ToString();
+                if (!string.IsNullOrWhiteSpace(value) && problemTypeOptions.Contains(value))
+                {
+                    selectedProblemTypes.Add(value);
+                }
+            }
+        }
+    }
+
+    private async Task OnEmergencyGradesChanged(ChangeEventArgs e)
+    {
+        selectedEmergencyGrades.Clear();
+        try
+        {
+            var selectedValues = await JSRuntime.InvokeAsync<string[]>("getSelectedOptions", emergencyGradesSelectElement);
+            if (selectedValues != null)
+            {
+                foreach (var value in selectedValues)
+                {
+                    if (Enum.TryParse<EsiLevel>(value, out var grade))
+                    {
+                        selectedEmergencyGrades.Add(grade);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Fallback if JS interop fails
+            if (e.Value != null)
+            {
+                var value = e.Value.ToString();
+                if (!string.IsNullOrWhiteSpace(value) && Enum.TryParse<EsiLevel>(value, out var grade))
+                {
+                    selectedEmergencyGrades.Add(grade);
+                }
+            }
+        }
+    }
+
+    private async Task ResetFilters()
+    {
+        selectedLevel = "country";
+        selectedLocationId = null;
+        selectedHospitalId = null;
+        selectedTimeRange = "7days";
+        customFromDate = null;
+        customToDate = null;
+        selectedProblemTypes.Clear();
+        selectedEmergencyGrades.Clear();
+        UpdateLocationOptions();
+        await ApplyFilters();
+    }
+
+    private async Task ExportData()
+    {
+        if (!doctorUserId.HasValue || summary == null) return;
+
+        try
+        {
+            var query = BuildQuery();
+            var url = $"/api/stats/export{query}&format=csv";
+            
+            // Navigate to the export endpoint which will trigger browser download
+            Nav.NavigateTo(url, forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error exporting data: {ex.Message}");
+        }
+    }
+
+    private async Task DownloadFile(string content, string fileName, string contentType)
+    {
+        // Create a download link using JavaScript
+        var js = $"var blob = new Blob([{System.Text.Json.JsonSerializer.Serialize(content)}], {{type: '{contentType}'}});" +
+                 $"var url = window.URL.createObjectURL(blob);" +
+                 $"var a = document.createElement('a');" +
+                 $"a.href = url; a.download = '{fileName}';" +
+                 $"document.body.appendChild(a); a.click();" +
+                 $"document.body.removeChild(a);" +
+                 $"window.URL.revokeObjectURL(url);";
+        
+        // Note: This requires JavaScript interop which would need to be set up
+        // For now, we'll use a simpler approach with a data URI
+    }
+}
+

@@ -1,0 +1,1063 @@
+@page "/personal-info"
+@attribute [Authorize]
+@using System.Security.Claims
+@using DigitalTriage.Domain.Entities
+@using DigitalTriage.Application.Contracts.Services
+@using Microsoft.JSInterop
+@inject IPatientService PatientService
+@inject IAuthHelper Auth
+@inject IHttpContextAccessor Http
+@inject NavigationManager Navigation
+@inject IHospitalService HospitalService
+@inject IFamilyMedicService FamilyMedicService
+@inject IEmailService EmailService
+@inject ILogger<PersonalInfo> Logger
+
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="page-header">
+                <h2 class="fw-bold mb-2">
+                    <i class="bi bi-person-circle me-2 text-primary"></i>Personal Information
+                </h2>
+                <p class="text-muted">Manage your personal details and identification</p>
+            </div>
+        </div>
+    </div>
+
+    @if (patient == null)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-body p-4">
+                        <h5 class="card-title mb-4">
+                            <i class="bi bi-person-vcard me-2 text-primary"></i>Identity Information
+                        </h5>
+                        
+                        <EditForm Model="patient" OnValidSubmit="HandleUpdate" OnInvalidSubmit="HandleInvalidSubmit" FormName="personalInfoForm">
+                            <AntiforgeryToken />
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="alert alert-danger" />
+
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">First Name</label>
+                                    <InputText class="form-control" @bind-Value="patient.FirstName" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Last Name</label>
+                                    <InputText class="form-control" @bind-Value="patient.LastName" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Phone Number</label>
+                                    <InputText class="form-control" @bind-Value="patient.PhoneNumber" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Citizenship</label>
+                                    <InputText class="form-control" @bind-Value="patient.Citizenship" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">CNP</label>
+                                    <InputText class="form-control" @bind-Value="patient.Cnp" maxlength="13" />
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label fw-semibold">Serie</label>
+                                    <InputText class="form-control" @bind-Value="patient.Serie" maxlength="2" />
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label fw-semibold">Nr</label>
+                                    <InputText class="form-control" @bind-Value="patient.Nr" maxlength="6" />
+                                </div>
+                            </div>
+
+                            <div class="border-top pt-4 mb-3">
+                                <h6 class="fw-semibold mb-3">
+                                    <i class="bi bi-geo-alt me-2 text-primary"></i>Place of Birth
+                                </h6>
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Country</label>
+                                        <InputText class="form-control" @bind-Value="patient.PlaceOfBirth!.Country" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">County</label>
+                                        <InputText class="form-control" @bind-Value="patient.PlaceOfBirth!.County" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">City</label>
+                                        <InputText class="form-control" @bind-Value="patient.PlaceOfBirth!.City" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="border-top pt-4 mb-3">
+                                <h6 class="fw-semibold mb-3">
+                                    <i class="bi bi-house me-2 text-primary"></i>Domicile Address
+                                </h6>
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-semibold">Country</label>
+                                        <InputText class="form-control" @bind-Value="patient.Domicile!.Country" />
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-semibold">County</label>
+                                        <InputText class="form-control" @bind-Value="patient.Domicile!.County" />
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-semibold">City</label>
+                                        <InputText class="form-control" @bind-Value="patient.Domicile!.City" />
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label fw-semibold">Street</label>
+                                        <InputText class="form-control" @bind-Value="patient.Domicile!.Street" />
+                                    </div>
+                                    <div class="col-md-1">
+                                        <label class="form-label fw-semibold">No.</label>
+                                        <InputText class="form-control" @bind-Value="patient.Domicile!.Number" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            @if (Auth.IsDoctor(CurrentUser) && patient.DoctorProfile != null)
+                            {
+                                <div class="border-top pt-4 mb-3">
+                                    <h6 class="fw-semibold mb-3">
+                                        <i class="bi bi-person-lines-fill me-2 text-primary"></i>Doctor Profile
+                                    </h6>
+                                    <div class="row g-3 mb-4">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-semibold">Specialization</label>
+                                            <InputText class="form-control" placeholder="Cardiology, Emergency Medicine, etc." @bind-Value="patient.DoctorProfile.Specialization" />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="alert alert-light border mb-0">
+                                                <i class="bi bi-info-circle me-2"></i>
+                                                <span class="small text-muted">
+                                                    Patients and hospitals see this specialization when assigning you to cases.
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save me-2"></i>Update Information
+                            </button>
+                        </EditForm>
+                    </div>
+                </div>
+
+                @if (!Auth.IsDoctor(CurrentUser))
+                {
+                    <div class="card shadow-sm border-0 border-danger border-2 mb-4">
+                        <div class="card-body p-4">
+                            <h5 class="card-title mb-4 text-danger">
+                                <i class="bi bi-exclamation-triangle me-2"></i>Danger Zone
+                            </h5>
+                            <p class="text-muted mb-3">
+                                Once you delete your account, there is no going back. This will permanently delete your account and all associated information including medical data and reported issues.
+                            </p>
+                            <button type="button" class="btn btn-danger" @onclick="ShowDeleteConfirmation">
+                                <i class="bi bi-trash me-2"></i>Delete Account
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <h5 class="card-title mb-4">
+                            <i class="bi bi-clipboard-pulse me-2 text-primary"></i>Reported Issues
+                        </h5>
+                        
+                        <EditForm Model="issueModel" OnValidSubmit="AddIssue" FormName="issueForm">
+                            <AntiforgeryToken />
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="alert alert-danger" />
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-4">
+                                    <InputText class="form-control" placeholder="Issue title" @bind-Value="issueModel.Title" />
+                                </div>
+                                <div class="col-md-6">
+                                    <InputTextArea class="form-control" placeholder="Describe your issue..." rows="2" @bind-Value="issueModel.Description" />
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-outline-primary w-100" type="submit">
+                                        <i class="bi bi-plus-circle me-1"></i>Add
+                                    </button>
+                                </div>
+                            </div>
+                        </EditForm>
+                        
+                        <div class="mt-3">
+                            @if(issues?.Any() == true)
+                            {
+                                foreach (var i in issues.OrderByDescending(x => x.CreatedAt))
+                                {
+                                    <div class="card mb-2 border-start border-primary border-3">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <strong>@i.Title</strong>
+                                                <small class="text-muted">
+                                                    <i class="bi bi-clock me-1"></i>@i.CreatedAt.LocalDateTime.ToString("MMM dd, yyyy HH:mm")
+                                                </small>
+                                            </div>
+                                            <div class="text-secondary mb-2">@i.Description</div>
+                                            <div class="d-flex justify-content-end gap-2 mt-2">
+                                                @if (patient?.FamilyMedicDoctorId.HasValue == true && !string.IsNullOrEmpty(patient.FamilyMedicEmail))
+                                                {
+                                                    <button class="btn btn-success btn-sm" 
+                                                            @onclick="async () => await SendIssueToFamilyMedic(i)" 
+                                                            disabled="@(IsSendingIssue(i.Id))">
+                                                        @if (IsSendingIssue(i.Id))
+                                                        {
+                                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <i class="bi bi-envelope-paper me-1"></i>
+                                                        }
+                                                        Send to Family Medic
+                                                    </button>
+                                                }
+                                                <button class="btn btn-outline-danger btn-sm" 
+                                                        @onclick="async () => await DeleteIssue(i)" 
+                                                        disabled="@(IsDeletingIssue(i.Id))">
+                                                    @if (IsDeletingIssue(i.Id))
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <i class="bi bi-trash me-1"></i>
+                                                    }
+                                                    Delete
+                                                </button>
+                                            </div>
+                                                @if (GetIssueError(i.Id) != null)
+                                                {
+                                                    <div class="alert alert-danger py-2 mt-2 mb-0">
+                                                        <i class="bi bi-exclamation-circle me-1"></i>@GetIssueError(i.Id)
+                                                    </div>
+                                                }
+                                                @if (GetIssueSuccess(i.Id) != null)
+                                                {
+                                                    <div class="alert alert-success py-2 mt-2 mb-0">
+                                                        <i class="bi bi-check-circle me-1"></i>@GetIssueSuccess(i.Id)
+                                                    </div>
+                                                }
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="alert alert-light text-center text-muted">
+                                    <i class="bi bi-clipboard-x display-6"></i>
+                                    <p class="mb-0 mt-2">No issues reported yet.</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 bg-primary text-white">
+                    <div class="card-body p-4">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-info-circle me-2"></i>Quick Info
+                        </h5>
+                        <ul class="list-unstyled mb-0">
+                            <li class="mb-3">
+                                <i class="bi bi-envelope me-2"></i>
+                                <strong>Email:</strong><br />
+                                <span class="opacity-75">@patient!.Email</span>
+                            </li>
+                            <li>
+                                <i class="bi bi-calendar-event me-2"></i>
+                                <strong>Member Since:</strong><br />
+                                <span class="opacity-75">Recently joined</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0 mt-4">
+                    <div class="card-body p-4">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-hospital me-2 text-primary"></i>Preferred Hospital
+                        </h5>
+                        <p class="text-muted mb-3">
+                            Select the hospital you want to visit for your current health issues. By default we assign the closest available hospital based on your domicile address.
+                        </p>
+                        <div class="alert alert-light border mb-4">
+                            <div class="d-flex align-items-start">
+                                <i class="bi bi-geo-alt text-primary fs-4 me-3"></i>
+                                <div>
+                                    <div class="fw-semibold">Current assignment</div>
+                                    @if (patient.PreferredHospital != null)
+                                    {
+                                        <div>@patient.PreferredHospital.Name</div>
+                                        <div class="text-muted small">
+                                            @FormatHospitalAddress(patient.PreferredHospital)
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-muted">No hospital assigned yet.</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label fw-semibold">Search</label>
+                                <InputText class="form-control" placeholder="Hospital name" @bind-Value="hospitalSearchTerm" />
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label fw-semibold">Country</label>
+                                <InputText class="form-control" placeholder="Country" @bind-Value="hospitalFilterCountry" />
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label fw-semibold">County</label>
+                                <InputText class="form-control" placeholder="County" @bind-Value="hospitalFilterCounty" />
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label fw-semibold">City</label>
+                                <InputText class="form-control" placeholder="City" @bind-Value="hospitalFilterCity" />
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 mb-3">
+                            <button class="btn btn-outline-primary" type="button" @onclick="SearchHospitals" disabled="@isHospitalSearchBusy">
+                                @if (isHospitalSearchBusy)
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                    <span class="ms-2">Searching...</span>
+                                }
+                                else
+                                {
+                                    <span class="d-inline-flex align-items-center">
+                                        <i class="bi bi-search me-1"></i>
+                                        Apply filters
+                                    </span>
+                                }
+                            </button>
+                            <button class="btn btn-outline-secondary" type="button" @onclick="ClearHospitalFilters" disabled="@isHospitalSearchBusy">
+                                <i class="bi bi-x-circle me-1"></i>Clear filters
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(hospitalSearchError))
+                        {
+                            <div class="alert alert-danger py-2">@hospitalSearchError</div>
+                        }
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="text-muted small">Showing @hospitalResults.Count result(s)</span>
+                            <button class="btn btn-link p-0" type="button" @onclick="AssignClosestHospital" disabled="@isAssigningHospital">
+                                @if (isAssigningHospital && assignMode == AssignMode.Nearest)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                <i class="bi bi-geo-fill me-1"></i>Assign closest hospital
+                            </button>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            @if (hospitalResults.Count == 0)
+                            {
+                                <div class="text-muted small">
+                                    Adjust the filters to find hospitals by location or name.
+                                </div>
+                            }
+                            else
+                            {
+                                foreach (var hospital in hospitalResults)
+                                {
+                                    var isCurrent = patient.PreferredHospitalId == hospital.Id;
+                                    <div class="list-group-item d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <div class="fw-semibold">@hospital.Name</div>
+                                            <div class="text-muted small">@FormatHospitalAddress(hospital)</div>
+                                        </div>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-secondary"
+                                                    type="button"
+                                                    @onclick="() => PreviewHospitalAsync(hospital)"
+                                                    @onclick:stopPropagation="true">
+                                                <i class="bi bi-info-circle me-1"></i>Details
+                                            </button>
+                                            <button class="btn btn-sm @(isCurrent ? "btn-success" : "btn-outline-primary")"
+                                                    disabled="@isAssigningHospital"
+                                                    @onclick="() => AssignHospital(hospital)"
+                                                    @onclick:stopPropagation="true">
+                                                @if (isAssigningHospital && assignMode == AssignMode.Manual && pendingHospitalId == hospital.Id)
+                                                {
+                                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                                }
+                                                else if (isCurrent)
+                                                {
+                                                    <i class="bi bi-check2-circle me-1"></i><span>Selected</span>
+                                                }
+                                                else
+                                                {
+                                                    <i class="bi bi-plus-circle me-1"></i><span>Select</span>
+                                                }
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        @if (previewHospital != null)
+                        {
+                            <div class="card mt-4">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <div>
+                                            <h6 class="card-title mb-1">
+                                                <i class="bi bi-hospital me-2 text-primary"></i>@previewHospital.Name
+                                            </h6>
+                                            <div class="text-muted small">@FormatHospitalAddress(previewHospital)</div>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="() => previewHospital = null">
+                                            <i class="bi bi-x-circle me-1"></i>Close
+                                        </button>
+                                    </div>
+
+                                    @if (isPreviewLoading)
+                                    {
+                                        <div class="d-flex justify-content-center py-3">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading doctors...</span>
+                                            </div>
+                                        </div>
+                                    }
+                                    else if (!string.IsNullOrEmpty(previewError))
+                                    {
+                                        <div class="alert alert-danger py-2">@previewError</div>
+                                    }
+                                    else if (previewDoctors.Count == 0)
+                                    {
+                                        <div class="alert alert-light border">
+                                            <i class="bi bi-info-circle me-2"></i>No doctors are currently associated with this hospital.
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-sm align-middle mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th scope="col">Doctor</th>
+                                                        <th scope="col">Specialization</th>
+                                                        <th scope="col">Email</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var doctor in previewDoctors)
+                                                    {
+                                                        <tr>
+                                                            <td>@doctor.Name</td>
+                                                            <td>@doctor.Specialization</td>
+                                                            <td>
+                                                                @if (!string.IsNullOrWhiteSpace(doctor.Email))
+                                                                {
+                                                                    <a href="mailto:@doctor.Email">@doctor.Email</a>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span class="text-muted">N/A</span>
+                                                                }
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@if(!string.IsNullOrEmpty(message))
+{
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div class="toast show" role="alert">
+            @if (isErrorMessage)
+            {
+                <div class="toast-header bg-danger text-white">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong class="me-auto">Error</strong>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close" @onclick="() => { message = null; isErrorMessage = false; }"></button>
+                </div>
+            }
+            else
+            {
+                <div class="toast-header bg-success text-white">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <strong class="me-auto">Success</strong>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close" @onclick="() => { message = null; isErrorMessage = false; }"></button>
+                </div>
+            }
+            <div class="toast-body">@message</div>
+        </div>
+    </div>
+}
+
+@if (showDeleteModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-danger">
+                    <h5 class="modal-title text-danger">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Confirm Account Deletion
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="fw-semibold">Are you absolutely sure you want to delete your account?</p>
+                    <p class="text-muted">
+                        This action cannot be undone. This will permanently delete:
+                    </p>
+                    <ul class="text-muted">
+                        <li>Your account and personal information</li>
+                        <li>All medical data associated with your account</li>
+                        <li>All reported issues</li>
+                    </ul>
+                    <p class="text-danger fw-semibold">This action is permanent and irreversible.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelDelete">
+                        <i class="bi bi-x-circle me-2"></i>Cancel
+                    </button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDelete" disabled="@isDeleting">
+                        @if (isDeleting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <text>Deleting...</text>
+                        }
+                        else
+                        {
+                            <i class="bi bi-trash me-2"></i>
+                            <text>Yes, Delete My Account</text>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+ private Patient? patient;
+private IReadOnlyList<PatientIssue>? issues;
+ private IssueModel issueModel = new();
+ private string? message;
+ private bool isErrorMessage = false;
+ private bool showDeleteModal = false;
+ private bool isDeleting = false;
+ private List<Hospital> hospitalResults = new();
+ private string hospitalSearchTerm = string.Empty;
+ private string hospitalFilterCountry = string.Empty;
+ private string hospitalFilterCounty = string.Empty;
+ private string hospitalFilterCity = string.Empty;
+ private string? hospitalSearchError;
+ private bool isHospitalSearchBusy;
+ private bool isAssigningHospital;
+ private AssignMode assignMode = AssignMode.Manual;
+ private int? pendingHospitalId;
+ private Hospital? previewHospital;
+ private bool isPreviewLoading;
+ private string? previewError;
+ private List<HospitalDoctorInfo> previewDoctors = new();
+ private readonly HashSet<int> sendingIssueIds = new();
+ private readonly HashSet<int> deletingIssueIds = new();
+ private readonly Dictionary<int, string> issueErrors = new();
+ private readonly Dictionary<int, string> issueSuccess = new();
+
+ [Inject] public IPatientIssueService IssueService { get; set; } = default!;
+
+ private ClaimsPrincipal CurrentUser => Http.HttpContext?.User ?? new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity());
+
+ protected override async Task OnInitializedAsync()
+ {
+  Console.WriteLine("=== PersonalInfo.razor: OnInitializedAsync called ===");
+  var id = Auth.GetUserId(CurrentUser);
+  if (!id.HasValue)
+  {
+   Console.WriteLine("No user ID found");
+   return;
+  }
+  Console.WriteLine($"Loading patient with ID: {id.Value}");
+  patient = await PatientService.GetByIdAsync(id.Value);
+  if (patient != null)
+  {
+   Console.WriteLine($"Patient loaded - Email: '{patient.Email}', FirstName: '{patient.FirstName}', LastName: '{patient.LastName}'");
+   patient.PlaceOfBirth ??= new PlaceOfBirth();
+   patient.Domicile ??= new Domicile();
+   if (Auth.IsDoctor(CurrentUser))
+   {
+    patient.DoctorProfile ??= new DoctorProfile { UserId = patient.Id };
+   }
+   Console.WriteLine("PlaceOfBirth and Domicile initialized");
+   if (patient.PreferredHospital != null)
+   {
+    hospitalResults = new List<Hospital> { patient.PreferredHospital };
+   }
+  }
+  else
+  {
+   Console.WriteLine("Patient not found");
+  }
+  issues = await IssueService.GetByPatientIdAsync(id.Value);
+  Console.WriteLine($"Loaded {issues?.Count ?? 0} issues");
+
+  await SearchHospitals();
+ }
+
+ private void HandleInvalidSubmit(EditContext editContext)
+ {
+  Console.WriteLine("=== PersonalInfo.razor: HandleInvalidSubmit CALLED (Validation FAILED) ===");
+  if (patient != null)
+  {
+   Console.WriteLine($"Patient state - FirstName: '{patient.FirstName}', LastName: '{patient.LastName}', CNP: '{patient.Cnp}'");
+  }
+  var validationMessages = editContext.GetValidationMessages();
+  Console.WriteLine($"Validation errors count: {validationMessages.Count()}");
+  foreach (var msg in validationMessages)
+  {
+   Console.WriteLine($"  Validation error: {msg}");
+  }
+ }
+
+ private async Task HandleUpdate()
+ {
+  Console.WriteLine("=== PersonalInfo.razor: HandleUpdate CALLED ===");
+  if (patient == null)
+  {
+   Console.WriteLine("ERROR: Patient is null");
+   return;
+  }
+  Console.WriteLine($"Updating patient - Email: '{patient.Email}', FirstName: '{patient.FirstName}', LastName: '{patient.LastName}'");
+  Console.WriteLine($"CNP: '{patient.Cnp}', Serie: '{patient.Serie}', Nr: '{patient.Nr}'");
+  await PatientService.UpdateAsync(patient);
+  Console.WriteLine("Update successful");
+  message = "Information updated successfully";
+ }
+
+ private async Task AddIssue()
+ {
+  var id = Auth.GetUserId(CurrentUser);
+  if (!id.HasValue) return;
+  await IssueService.CreateAsync(id.Value, issueModel.Title!, issueModel.Description!);
+  issues = await IssueService.GetByPatientIdAsync(id.Value);
+  issueModel = new();
+ }
+
+private async Task SearchHospitals()
+{
+ hospitalSearchError = null;
+ try
+ {
+  isHospitalSearchBusy = true;
+  var hasSearch = !string.IsNullOrWhiteSpace(hospitalSearchTerm);
+  var hasLocationFilters = !string.IsNullOrWhiteSpace(hospitalFilterCountry)
+      || !string.IsNullOrWhiteSpace(hospitalFilterCounty)
+      || !string.IsNullOrWhiteSpace(hospitalFilterCity);
+
+  hospitalResults = (!hasSearch && !hasLocationFilters)
+      ? (await HospitalService.GetAllAsync()).ToList()
+      : (await HospitalService.SearchHospitalsAsync(
+          hospitalSearchTerm,
+          hospitalFilterCountry,
+          hospitalFilterCounty,
+          hospitalFilterCity,
+          maxResults: 200)).ToList();
+ 
+  if (patient?.PreferredHospital != null && !hospitalResults.Any(h => h.Id == patient.PreferredHospital.Id))
+  {
+   hospitalResults.Insert(0, patient.PreferredHospital);
+  }
+
+  if (previewHospital != null && hospitalResults.All(h => h.Id != previewHospital.Id))
+  {
+   previewHospital = null;
+   previewDoctors.Clear();
+   previewError = null;
+  }
+ }
+ catch (Exception ex)
+ {
+  Console.WriteLine($"Error searching hospitals: {ex}");
+  hospitalSearchError = "We couldn't load hospitals right now. Please try again.";
+ }
+ finally
+ {
+  isHospitalSearchBusy = false;
+ }
+}
+
+private async Task ClearHospitalFilters()
+{
+ hospitalSearchTerm = string.Empty;
+ hospitalFilterCountry = string.Empty;
+ hospitalFilterCounty = string.Empty;
+ hospitalFilterCity = string.Empty;
+ previewHospital = null;
+ previewDoctors.Clear();
+ previewError = null;
+
+ await SearchHospitals();
+}
+
+private async Task AssignHospital(Hospital hospital)
+{
+ if (patient == null)
+ {
+  return;
+ }
+
+ try
+ {
+  isAssigningHospital = true;
+  assignMode = AssignMode.Manual;
+  pendingHospitalId = hospital.Id;
+  Console.WriteLine($"Assigning hospital {hospital.Id} to patient {patient.Id}");
+  await HospitalService.SetPatientPreferredHospitalAsync(patient.Id, hospital.Id);
+  patient.PreferredHospitalId = hospital.Id;
+  patient.PreferredHospital = hospital;
+
+  if (!hospitalResults.Any(h => h.Id == hospital.Id))
+  {
+   hospitalResults.Insert(0, hospital);
+  }
+
+  isErrorMessage = false;
+  message = $"Preferred hospital updated to {hospital.Name}.";
+
+  await PreviewHospitalAsync(hospital);
+ }
+ catch (Exception ex)
+ {
+  Console.WriteLine($"Error assigning hospital: {ex}");
+  isErrorMessage = true;
+  message = "We couldn't update your preferred hospital. Please try again.";
+ }
+ finally
+ {
+  isAssigningHospital = false;
+  pendingHospitalId = null;
+ }
+}
+
+private async Task AssignClosestHospital()
+{
+ if (patient == null)
+ {
+  return;
+ }
+
+ try
+ {
+  isAssigningHospital = true;
+  assignMode = AssignMode.Nearest;
+  Console.WriteLine($"Assigning closest hospital for patient {patient.Id}");
+  var closest = await HospitalService.FindClosestHospitalAsync(patient.Domicile);
+  if (closest == null)
+  {
+   hospitalSearchError = "No hospitals are available yet. Please try again later.";
+   return;
+  }
+
+  await HospitalService.SetPatientPreferredHospitalAsync(patient.Id, closest.Id);
+  patient.PreferredHospitalId = closest.Id;
+  patient.PreferredHospital = closest;
+
+  if (!hospitalResults.Any(h => h.Id == closest.Id))
+  {
+   hospitalResults.Insert(0, closest);
+  }
+ 
+  isErrorMessage = false;
+  message = $"We assigned you to the closest hospital: {closest.Name}.";
+
+  await PreviewHospitalAsync(closest);
+ }
+ catch (Exception ex)
+ {
+  Console.WriteLine($"Error assigning closest hospital: {ex}");
+  hospitalSearchError = "We couldn't assign the closest hospital. Please try again.";
+ }
+ finally
+ {
+  isAssigningHospital = false;
+  assignMode = AssignMode.Manual;
+ }
+}
+
+private async Task PreviewHospitalAsync(Hospital hospital)
+{
+ previewError = null;
+ isPreviewLoading = true;
+ previewHospital = hospital;
+ previewDoctors = new List<HospitalDoctorInfo>();
+
+ try
+ {
+  var detail = await HospitalService.GetHospitalWithDoctorsAsync(hospital.Id);
+  if (detail == null)
+  {
+   previewError = "We couldn't load the hospital details.";
+   return;
+  }
+
+  previewHospital = detail;
+
+  previewDoctors = detail.DoctorMemberships?
+   .Where(m => m.IsActive && m.Doctor != null && m.Doctor.User != null)
+   .Select(m => new HospitalDoctorInfo
+   {
+    Name = BuildDoctorDisplayName(m.Doctor.User),
+    Email = m.Doctor.User.Email,
+    Specialization = m.Doctor.Specialization ?? "Unknown"
+   })
+   .OrderBy(d => d.Name)
+   .ToList() ?? new List<HospitalDoctorInfo>();
+ }
+ catch (Exception ex)
+ {
+  Console.WriteLine($"Error loading hospital details: {ex}");
+  previewError = "We couldn't load the doctor list. Please try again.";
+ }
+ finally
+ {
+  isPreviewLoading = false;
+ }
+}
+
+ private void ShowDeleteConfirmation()
+ {
+  showDeleteModal = true;
+ }
+
+ private void CancelDelete()
+ {
+  showDeleteModal = false;
+ }
+
+ private async Task ConfirmDelete()
+ {
+  if (isDeleting) return;
+
+  isDeleting = true;
+  isErrorMessage = false;
+  try
+  {
+   Console.WriteLine("=== PersonalInfo.razor: Deleting account directly via service ===");
+
+   if (patient == null)
+   {
+    Console.WriteLine("ERROR: Patient is not loaded");
+    isErrorMessage = true;
+    message = "We could not load your account. Please refresh and try again.";
+    showDeleteModal = false;
+    isDeleting = false;
+    return;
+   }
+
+   var userId = patient.Id;
+   Console.WriteLine($"Attempting to delete account for user ID: {userId}");
+   await PatientService.DeleteAsync(userId);
+
+   Console.WriteLine("Account deleted successfully, redirecting to logout...");
+   Navigation.NavigateTo("/Account/Logout", forceLoad: true);
+  }
+  catch (Exception ex)
+  {
+   Console.WriteLine($"Error deleting account: {ex.Message}");
+   Console.WriteLine(ex.StackTrace);
+   isErrorMessage = true;
+   message = "An error occurred while deleting your account. Please try again.";
+   showDeleteModal = false;
+   isDeleting = false;
+  }
+ }
+ 
+ public class IssueModel
+ {
+  [Required, MaxLength(200)]
+  public string? Title { get; set; }
+  [Required, MaxLength(2000)]
+  public string? Description { get; set; }
+ }
+ 
+private static string FormatHospitalAddress(Hospital hospital)
+{
+ if (hospital == null)
+ {
+  return string.Empty;
+ }
+
+ var parts = new[]
+ {
+  hospital.Street,
+  hospital.Number,
+  hospital.City,
+  hospital.County,
+  hospital.Country
+ }
+ .Where(part => !string.IsNullOrWhiteSpace(part));
+
+ return string.Join(", ", parts);
+}
+
+private static string BuildDoctorDisplayName(Patient? user)
+{
+ if (user == null)
+ {
+  return "Doctor";
+ }
+
+ var name = $"{user.FirstName ?? string.Empty} {user.LastName ?? string.Empty}".Trim();
+ if (string.IsNullOrWhiteSpace(name))
+ {
+  name = user.Email ?? "Doctor";
+ }
+
+ return name;
+}
+
+private class HospitalDoctorInfo
+{
+ public string Name { get; set; } = string.Empty;
+ public string Specialization { get; set; } = string.Empty;
+ public string? Email { get; set; }
+}
+ 
+ private enum AssignMode
+ {
+  Manual,
+  Nearest
+ }
+
+ private async Task SendIssueToFamilyMedic(PatientIssue issue)
+ {
+  if (patient == null || string.IsNullOrEmpty(patient.FamilyMedicEmail))
+  {
+   issueErrors[issue.Id] = "No family medic assigned.";
+   return;
+  }
+
+  sendingIssueIds.Add(issue.Id);
+  issueErrors.Remove(issue.Id);
+  issueSuccess.Remove(issue.Id);
+
+  try
+  {
+   // Get Outlook token
+   var outlookToken = await FamilyMedicService.GetOutlookTokenAsync(patient.Id);
+   
+   if (string.IsNullOrEmpty(outlookToken))
+   {
+    issueErrors[issue.Id] = "Please connect your Outlook account first. Go to Medical Information page to set up Outlook integration.";
+    return;
+   }
+
+   // Send email via Outlook
+   var success = await EmailService.SendProblemToFamilyMedicAsync(
+    patient.Email,
+    patient.FamilyMedicEmail,
+    outlookToken,
+    issue.Title ?? "Medical Issue",
+    issue.Description ?? "No description provided",
+    issue.ProblemType,
+    issue.EmergencyGrade.HasValue ? (int)issue.EmergencyGrade.Value : null);
+
+   if (success)
+   {
+    issueSuccess[issue.Id] = "Issue sent to your family medic successfully.";
+    issueErrors.Remove(issue.Id);
+   }
+   else
+   {
+    issueErrors[issue.Id] = "Failed to send email. Please try again or contact your family medic directly.";
+    issueSuccess.Remove(issue.Id);
+   }
+  }
+  catch (Exception ex)
+  {
+   Logger.LogError(ex, "Error sending issue {IssueId} to family medic", issue.Id);
+   issueErrors[issue.Id] = "An error occurred while sending to your family medic. Please try again.";
+   issueSuccess.Remove(issue.Id);
+  }
+  finally
+  {
+   sendingIssueIds.Remove(issue.Id);
+  }
+ }
+
+ private bool IsSendingIssue(int issueId) => sendingIssueIds.Contains(issueId);
+ private bool IsDeletingIssue(int issueId) => deletingIssueIds.Contains(issueId);
+ private string? GetIssueError(int issueId) => issueErrors.TryGetValue(issueId, out var error) ? error : null;
+ private string? GetIssueSuccess(int issueId) => issueSuccess.TryGetValue(issueId, out var success) ? success : null;
+
+ private async Task DeleteIssue(PatientIssue issue)
+ {
+  if (patient == null)
+  {
+   issueErrors[issue.Id] = "Unable to delete issue. Please refresh the page.";
+   return;
+  }
+
+  deletingIssueIds.Add(issue.Id);
+  issueErrors.Remove(issue.Id);
+  issueSuccess.Remove(issue.Id);
+
+  try
+  {
+   var success = await IssueService.DeleteAsync(issue.Id, patient.Id);
+   if (success)
+   {
+    // Reload issues list
+    var id = Auth.GetUserId(CurrentUser);
+    if (id.HasValue)
+    {
+     issues = await IssueService.GetByPatientIdAsync(id.Value);
+    }
+    issueSuccess[issue.Id] = "Issue deleted successfully.";
+   }
+   else
+   {
+    issueErrors[issue.Id] = "Failed to delete issue. It may have already been deleted.";
+   }
+  }
+  catch (Exception ex)
+  {
+   Logger.LogError(ex, "Error deleting issue {IssueId}", issue.Id);
+   issueErrors[issue.Id] = "An error occurred while deleting the issue. Please try again.";
+  }
+  finally
+  {
+   deletingIssueIds.Remove(issue.Id);
+  }
+ }
+}

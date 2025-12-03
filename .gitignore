@@ -1,0 +1,183 @@
+# Solution & tooling folders
+.vs/
+.vscode/
+.ionide/
+.DS_Store
+Thumbs.db
+
+# User specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.rsuser
+*.userprefs
+
+# Build output (solution root & nested projects)
+[Bb]in/
+[Oo]bj/
+**/[Bb]in/
+**/[Oo]bj/
+**/[Dd]ebug*/
+**/[Rr]elease*/
+**/[Rr]eleases*/
+**/[Aa]rtifacts*/
+artifacts/
+bld/
+[Ll]og/
+[Ll]ogs/
+[Bb]uild[Ll]og.*
+
+# Test project specific build artifacts
+tests/**/bin/
+tests/**/obj/
+tests/**/TestResults/
+tests/**/coverage/
+
+# Publish / deployment output
+[Pp]ublish/
+AppPackages/
+BundleArtifacts/
+_pkginfo.txt
+PublishScripts/
+
+# Package management
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nupkg
+*.snupkg
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.fragment.lock.json
+project.assets.json
+project.nuget.cache
+**/project.assets.json
+**/project.nuget.cache
+
+# Coverage & analysis
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+coverage/
+**/coverage/
+BenchmarkDotNet.Artifacts/
+*.binlog
+
+# Test results & reports
+TestResults/
+[Tt]est[Rr]esult*/
+[Tt]est[Rr]esults/
+*.trx
+**/TestResults/
+**/test-results/
+**/TestResults.xml
+**/TestResults.json
+xunit.xml
+xunit*.xml
+*.testlog
+
+# Caches & temp files
+*.cache
+*.cachefile
+*.log
+*.tmp
+*.tmp_proj
+*.svclog
+.localhistory/
+.mfractor/
+
+# Node / tooling
+node_modules/
+.NTVS_analysis.dat
+
+# Database & secrets
+*.mdf
+*.ldf
+*.ndf
+*.dbmdl
+*.dbproj.schemaview
+*.pfx
+*.publishsettings
+*.Secret.json
+
+# Python (if used for tooling)
+__pycache__/
+*.pyc
+
+# Misc IDE extensions
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+_TeamCity*/
+*.dotCover
+.axoCover/
+_NCrunch_*
+.*crunch*.local.xml
+nCrunchTemp_*
+.cr/personal
+.fake/
+
+# Generated artifacts from legacy VS tooling
+Generated_Code/
+Generated\ Files/
+_UpgradeReport_Files/
+Backup*/
+UpgradeLog*.*
+ServiceFabricBackup/
+
+# OS specific
+ehthumbs.db
+Desktop.ini
+
+# Application specific
+wwwroot/uploads/
+wwwroot/dist/
+src/**/wwwroot/uploads/
+src/**/wwwroot/dist/
+
+# Test specific files
+*.testsettings
+*.testrunconfig
+.vs/TestResults/
+.vs/VSTestResults/
+**/.vs/TestResults/
+**/.vs/VSTestResults/
+
+# In-memory database files (if any are created)
+*.db-shm
+*.db-wal
+*.db-journal
+
+# IDE test runner files
+.idea/
+*.iml
+.vscode-test/
+
+# ============================================
+# ?? SECURITY: Ignore files with API keys
+# ============================================
+# Development settings with secrets
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.Local.json
+
+# User secrets
+secrets.json
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# ============================================
+
+*.local.json
+*.secrets.json
+
+# ============================================
+

@@ -1,0 +1,438 @@
+@page "/family-patients"
+@attribute [Authorize(Roles = "Doctor")]
+@using DigitalTriage.Domain.Entities
+@using DigitalTriage.Presentation.Common.Helpers
+@using DigitalTriage.Application.Contracts.Services
+@using System.Security.Claims
+@inject IFamilyMedicService FamilyMedicService
+@inject IPatientService PatientService
+@inject IAuthHelper Auth
+@inject IHttpContextAccessor Http
+@inject ILogger<FamilyPatients> Logger
+
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="page-header">
+                <h2 class="fw-bold mb-2">
+                    <i class="bi bi-people-fill me-2 text-success"></i>Family Patients
+                </h2>
+                <p class="text-muted">Manage your family patients and pending requests</p>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <div class="spinner-border text-success" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Pending Requests Section -->
+        @if (pendingRequests.Any())
+        {
+            <div class="card shadow-sm border-0 mb-4 border-warning border-3">
+                <div class="card-header bg-warning bg-opacity-10">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history me-2"></i>Pending Family Medic Requests
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @foreach (var request in pendingRequests)
+                    {
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-md-6">
+                                        <h6 class="mb-1">
+                                            <i class="bi bi-person me-2"></i>
+                                            @(request.Patient?.FirstName ?? "") @(request.Patient?.LastName ?? "")
+                                        </h6>
+                                        <p class="text-muted mb-0 small">
+                                            <i class="bi bi-envelope me-1"></i>@(request.Patient?.Email ?? "")
+                                        </p>
+                                        <p class="text-muted mb-0 small">
+                                            <i class="bi bi-calendar me-1"></i>Requested: @request.RequestedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")
+                                        </p>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-success btn-sm" 
+                                                    @onclick="async () => await AcceptRequest(request.Id)" 
+                                                    disabled="@(isProcessingRequest)">
+                                                @if (isProcessingRequest)
+                                                {
+                                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                                }
+                                                else
+                                                {
+                                                    <i class="bi bi-check-circle me-1"></i>
+                                                }
+                                                Accept
+                                            </button>
+                                            <button class="btn btn-danger btn-sm" 
+                                                    @onclick="async () => await RejectRequest(request.Id)" 
+                                                    disabled="@(isProcessingRequest)">
+                                                <i class="bi bi-x-circle me-1"></i>Reject
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Family Patients Section -->
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-success bg-opacity-10">
+                <h5 class="mb-0">
+                    <i class="bi bi-people me-2"></i>My Family Patients (@familyPatients.Count)
+                </h5>
+            </div>
+            <div class="card-body">
+                @if (!familyPatients.Any())
+                {
+                    <div class="alert alert-light border">
+                        <i class="bi bi-info-circle me-2"></i>You don't have any family patients yet. Patients can request you as their family medic.
+                    </div>
+                }
+                else
+                {
+                    <div class="row">
+                        @foreach (var patient in familyPatients)
+                        {
+                            <div class="col-lg-6 mb-4">
+                                <div class="card shadow-sm border-0 h-100 patient-card" style="cursor: pointer;" @onclick="() => OpenPatientModal(patient)">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-start mb-3">
+                                            <div class="avatar bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
+                                                <i class="bi bi-person fs-4"></i>
+                                            </div>
+                                            <div class="flex-grow-1">
+                                                <h5 class="card-title mb-1">@patient.FirstName @patient.LastName</h5>
+                                                <p class="card-subtitle text-muted mb-0">
+                                                    <i class="bi bi-envelope me-1"></i>@patient.Email
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        @if (patient.PhoneNumber != null)
+                                        {
+                                            <p class="small text-muted mb-2">
+                                                <i class="bi bi-telephone me-1"></i>@patient.PhoneNumber
+                                            </p>
+                                        }
+
+                                        @if (patient.MedicalDatas?.Any() == true)
+                                        {
+                                            <div class="mb-2">
+                                                <span class="badge bg-info">@patient.MedicalDatas.Count Medical Record(s)</span>
+                                            </div>
+                                        }
+
+                                        @if (patient.Issues?.Any(i => i.IsActive) == true)
+                                        {
+                                            var activeIssues = patient.Issues.Where(i => i.IsActive).ToList();
+                                            <div class="mb-2">
+                                                <span class="badge bg-warning">@activeIssues.Count Active Issue(s)</span>
+                                            </div>
+                                        }
+
+                                        <div class="mt-3 text-center">
+                                            <button class="btn btn-outline-primary btn-sm w-100" @onclick="() => OpenPatientModal(patient)" @onclick:stopPropagation="true">
+                                                <i class="bi bi-eye me-2"></i>View Full Details
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Patient Details Modal -->
+@if (selectedPatient != null)
+{
+    <div class="modal fade show" id="patientModal" tabindex="-1" style="display: block;" role="dialog">
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-person-circle me-2"></i>Patient Details
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="ClosePatientModal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <div class="row">
+                        <!-- Personal Information -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card shadow-sm border-primary border-2">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-3">
+                                        <i class="bi bi-person-vcard me-2 text-primary"></i>Personal Information
+                                    </h6>
+                                    <table class="table table-borderless mb-0">
+                                        <tr>
+                                            <td class="fw-semibold" width="40%">Name:</td>
+                                            <td>@selectedPatient.FirstName @selectedPatient.LastName</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-semibold">Email:</td>
+                                            <td>@selectedPatient.Email</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-semibold">Phone:</td>
+                                            <td>@(selectedPatient.PhoneNumber ?? "N/A")</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-semibold">CNP:</td>
+                                            <td>@(selectedPatient.Cnp ?? "N/A")</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Medical Information -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card shadow-sm border-danger border-2">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-3">
+                                        <i class="bi bi-heart-pulse me-2 text-danger"></i>Medical Information
+                                    </h6>
+                                    @if (selectedPatient.MedicalDatas?.Any() == true)
+                                    {
+                                        @foreach (var medicalData in selectedPatient.MedicalDatas)
+                                        {
+                                            <table class="table table-borderless mb-0">
+                                                <tr>
+                                                    <td class="fw-semibold" width="40%">Blood Type:</td>
+                                                    <td>@(medicalData.BloodType ?? "N/A")</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="fw-semibold">Allergies:</td>
+                                                    <td>@(string.IsNullOrEmpty(medicalData.Allergies) ? "None" : medicalData.Allergies)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="fw-semibold">Chronic Diseases:</td>
+                                                    <td>@(string.IsNullOrEmpty(medicalData.ChronicDiseases) ? "None" : medicalData.ChronicDiseases)</td>
+                                                </tr>
+                                                @if (!string.IsNullOrEmpty(medicalData.Symptoms))
+                                                {
+                                                    <tr>
+                                                        <td class="fw-semibold">Symptoms:</td>
+                                                        <td>@medicalData.Symptoms</td>
+                                                    </tr>
+                                                }
+                                            </table>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted mb-0">No medical data available</p>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active Issues -->
+                        @if (selectedPatient.Issues?.Any(i => i.IsActive) == true)
+                        {
+                            <div class="col-12 mb-4">
+                                <div class="card shadow-sm border-warning border-2">
+                                    <div class="card-body">
+                                        <h6 class="card-title mb-3">
+                                            <i class="bi bi-exclamation-triangle me-2 text-warning"></i>Active Issues
+                                        </h6>
+                                        @foreach (var issue in selectedPatient.Issues.Where(i => i.IsActive))
+                                        {
+                                            <div class="mb-3 pb-3 border-bottom">
+                                                <h6>@issue.Title</h6>
+                                                <p class="mb-1">@issue.Description</p>
+                                                @if (!string.IsNullOrEmpty(issue.ProblemType))
+                                                {
+                                                    <span class="badge bg-info me-1">@issue.ProblemType</span>
+                                                }
+                                                @if (issue.EmergencyGrade.HasValue)
+                                                {
+                                                    <span class="badge bg-danger">Emergency Grade: @issue.EmergencyGrade</span>
+                                                }
+                                                <p class="text-muted small mb-0 mt-2">
+                                                    <i class="bi bi-calendar me-1"></i>Created: @issue.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")
+                                                </p>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="ClosePatientModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div class="toast show" role="alert">
+            <div class="toast-header bg-success text-white">
+                <i class="bi bi-check-circle me-2"></i>
+                <strong class="me-auto">Success</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">@message</div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Patient> familyPatients = new();
+    private List<FamilyMedicRequest> pendingRequests = new();
+    private Patient? selectedPatient;
+    private bool isLoading = true;
+    private bool isProcessingRequest;
+    private string? message;
+    private int? doctorId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = Http.HttpContext?.User ?? new ClaimsPrincipal(new ClaimsIdentity());
+        var userId = Auth.GetUserId(user);
+        var userEmail = Auth.GetUserEmail(user);
+
+        if (!userId.HasValue)
+        {
+            Logger.LogWarning("User not authenticated");
+            return;
+        }
+
+        // Get doctor profile
+        var doctor = await PatientService.GetByIdAsync(userId.Value);
+        if (doctor?.DoctorProfile == null)
+        {
+            Logger.LogWarning("User {UserId} is not a doctor", userId.Value);
+            return;
+        }
+
+        doctorId = doctor.DoctorProfile.Id;
+
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        try
+        {
+            if (doctorId.HasValue)
+            {
+                familyPatients = (await FamilyMedicService.GetFamilyPatientsAsync(doctorId.Value)).ToList();
+            }
+
+            var userEmail = Auth.GetUserEmail(Http.HttpContext?.User ?? new ClaimsPrincipal(new ClaimsIdentity()));
+            if (!string.IsNullOrEmpty(userEmail))
+            {
+                pendingRequests = (await FamilyMedicService.GetPendingRequestsForDoctorAsync(userEmail)).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading family patients data");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task AcceptRequest(int requestId)
+    {
+        if (!doctorId.HasValue)
+        {
+            return;
+        }
+
+        isProcessingRequest = true;
+        try
+        {
+            var success = await FamilyMedicService.AcceptFamilyMedicRequestAsync(requestId, doctorId.Value);
+            if (success)
+            {
+                message = "Family medic request accepted successfully.";
+                await LoadDataAsync();
+            }
+            else
+            {
+                message = "Failed to accept the request.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error accepting family medic request {RequestId}", requestId);
+            message = "An error occurred while accepting the request.";
+        }
+        finally
+        {
+            isProcessingRequest = false;
+        }
+    }
+
+    private async Task RejectRequest(int requestId)
+    {
+        if (!doctorId.HasValue)
+        {
+            return;
+        }
+
+        isProcessingRequest = true;
+        try
+        {
+            var success = await FamilyMedicService.RejectFamilyMedicRequestAsync(requestId, doctorId.Value);
+            if (success)
+            {
+                message = "Family medic request rejected.";
+                await LoadDataAsync();
+            }
+            else
+            {
+                message = "Failed to reject the request.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error rejecting family medic request {RequestId}", requestId);
+            message = "An error occurred while rejecting the request.";
+        }
+        finally
+        {
+            isProcessingRequest = false;
+        }
+    }
+
+    private void OpenPatientModal(Patient patient)
+    {
+        selectedPatient = patient;
+    }
+
+    private void ClosePatientModal()
+    {
+        selectedPatient = null;
+    }
+}
+

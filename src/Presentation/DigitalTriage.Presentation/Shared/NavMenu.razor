@@ -1,0 +1,252 @@
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Authorization
+@using DigitalTriage.Presentation.Common.Helpers
+@implements IDisposable
+@inject NavigationManager Nav
+@inject IHttpContextAccessor Http
+@inject IAuthHelper Auth
+@inject IJSRuntime JSRuntime
+
+<div class="nav-shell">
+    <!-- Brand Section -->
+    <div class="brand-section">
+        <div class="brand">
+            <div class="brand-mark">
+                <i class="bi bi-heart-pulse-fill"></i>
+            </div>
+            <div class="brand-content">
+                <span class="brand-name">Digital Triage</span>
+                <span class="brand-tagline">Medical Platform</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Info (if authenticated) -->
+    @if (Http.HttpContext!.User.Identity?.IsAuthenticated == true)
+    {
+        <div class="user-info">
+            <div class="user-avatar">
+                <i class="bi bi-person-circle"></i>
+            </div>
+            <div class="user-details">
+                <span class="user-name">@(Auth.GetUserEmail(Http.HttpContext!.User) ?? "User")</span>
+                <span class="user-role">@(Auth.IsDoctor(Http.HttpContext!.User) ? "Doctor" : "Patient")</span>
+            </div>
+        </div>
+    }
+
+    <!-- Navigation Menu -->
+    <nav class="menu-container">
+        <ul class="menu">
+            <!-- Home -->
+            <li>
+                <button type="button"
+                        class="menu-link menu-card @GetActiveClass("/", exact: true)"
+                        @onclick="@(() => NavigateTo("/"))"
+                        aria-label="Home">
+                    <span class="icon-wrapper">
+                        <i class="bi bi-house-door-fill"></i>
+                    </span>
+                    <span class="label">Home</span>
+                </button>
+            </li>
+
+            @if (Http.HttpContext!.User.Identity?.IsAuthenticated == false)
+            {
+                <!-- Account Section (for unauthenticated users) -->
+                <li class="menu-section">
+                    <span class="section-label">ACCOUNT</span>
+                </li>
+                <li>
+                    <button type="button"
+                            class="menu-link menu-card @GetActiveClass("/register")"
+                            @onclick="@(() => NavigateTo("/register"))"
+                            aria-label="Create Account">
+                        <span class="icon-wrapper">
+                            <i class="bi bi-person-plus-fill"></i>
+                        </span>
+                        <span class="label">Create Account</span>
+                    </button>
+                </li>
+                <li>
+                    <button type="button"
+                            class="menu-link menu-card @GetActiveClass("/login")"
+                            @onclick="@(() => NavigateTo("/login"))"
+                            aria-label="Login">
+                        <span class="icon-wrapper">
+                            <i class="bi bi-box-arrow-in-right"></i>
+                        </span>
+                        <span class="label">Login</span>
+                    </button>
+                </li>
+            }
+
+            @if (Http.HttpContext!.User.Identity?.IsAuthenticated == true)
+            {
+                <!-- Profile Section (for patients only) -->
+                @if (!Auth.IsDoctor(Http.HttpContext!.User))
+                {
+                    <li class="menu-section">
+                        <span class="section-label">PROFILE</span>
+                    </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card @GetActiveClass("/personal-info")"
+                                @onclick="@(() => NavigateTo("/personal-info"))"
+                                aria-label="Personal Information">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-person-vcard-fill"></i>
+                            </span>
+                            <span class="label">Personal Information</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card @GetActiveClass("/medical-info")"
+                                @onclick="@(() => NavigateTo("/medical-info"))"
+                                aria-label="Medical Information">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-heart-pulse-fill"></i>
+                            </span>
+                            <span class="label">Medical Information</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card @GetActiveClass("/ai-triage")"
+                                @onclick="@(() => NavigateTo("/ai-triage"))"
+                                aria-label="AI Triage">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-robot"></i>
+                            </span>
+                            <span class="label">AI Triage</span>
+                        </button>
+                    </li>
+                }
+
+                <!-- Admin Section (for doctors only) -->
+                @if (Auth.IsDoctor(Http.HttpContext!.User))
+                {
+                    <li class="menu-section">
+                        <span class="section-label">ADMINISTRATION</span>
+                    </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card menu-card-admin @GetActiveClass("/admin")"
+                                @onclick="@(() => NavigateTo("/admin"))"
+                                aria-label="Admin Dashboard">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-speedometer2"></i>
+                            </span>
+                            <span class="label">Admin Dashboard</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card menu-card-admin @GetActiveClass("/hospital-management")"
+                                @onclick="@(() => NavigateTo("/hospital-management"))"
+                                aria-label="Hospital Management">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-hospital"></i>
+                            </span>
+                            <span class="label">Hospital Management</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card menu-card-admin @GetActiveClass("/statistics")"
+                                @onclick="@(() => NavigateTo("/statistics"))"
+                                aria-label="Statistics">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-bar-chart-fill"></i>
+                            </span>
+                            <span class="label">Statistics</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card menu-card-admin @GetActiveClass("/family-patients")"
+                                @onclick="@(() => NavigateTo("/family-patients"))"
+                                aria-label="Family Patients">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-people-fill"></i>
+                            </span>
+                            <span class="label">Family Patients</span>
+                        </button>
+                    </li>
+                }
+            }
+        </ul>
+    </nav>
+
+    <!-- Footer (Logout button for authenticated users) -->
+    @if (Http.HttpContext!.User.Identity?.IsAuthenticated == true)
+    {
+        <div class="menu-footer">
+            <button class="menu-link menu-card menu-card-logout" @onclick="Logout">
+                <span class="icon-wrapper">
+                    <i class="bi bi-box-arrow-right"></i>
+                </span>
+                <span class="label">Exit</span>
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // Ensure we re-render when the URL changes so active classes update immediately
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+    }
+
+    private void Logout()
+    {
+        // Navigate to the Razor Page that performs logout
+        // forceLoad: true ensures a full page reload with a real HTTP request
+        Nav.NavigateTo("/Account/Logout", forceLoad: true);
+    }
+
+    private void NavigateTo(string href)
+    {
+        Nav.NavigateTo(href);
+    }
+
+    private string GetActiveClass(string href, bool exact = false)
+    {
+        if (string.IsNullOrWhiteSpace(href)) return string.Empty;
+
+        // Normalize current path
+        var current = "/" + Nav.ToBaseRelativePath(Nav.Uri).Trim('/');
+        if (current == "/")
+        {
+            // root stays root
+        }
+
+        // Normalize target
+        var target = "/" + href.Trim('/');
+
+        if (exact)
+        {
+            return string.Equals(current, target, StringComparison.OrdinalIgnoreCase) ? "active" : string.Empty;
+        }
+
+        // non-exact: treat root separately to avoid everything starting with '/'
+        if (target == "/")
+        {
+            return current == "/" ? "active" : string.Empty;
+        }
+
+        return current.StartsWith(target, StringComparison.OrdinalIgnoreCase) ? "active" : string.Empty;
+    }
+}

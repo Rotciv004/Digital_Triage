@@ -1,0 +1,50 @@
+/* Modern Vertical Sidebar Navigation */
+:root {
+    --nav-bg: #0f766e; /* teal700 */
+    --nav-bg-dark: #0b5f59;
+    --nav-accent: #f7b500;
+    --nav-text: #eaf7f6;
+    --nav-muted: #cfe8e6;
+    --active: #ffffff;
+}
+
+.page {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: 100vh;
+}
+
+.sidebar {
+    background: linear-gradient(180deg, var(--nav-bg), var(--nav-bg-dark));
+    color: var(--nav-text);
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+main {
+    background: #f8f9fa;
+    overflow-x: hidden;
+}
+
+.top-row {
+    border-bottom: 1px solid #e5eef4;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.content {
+    padding: 2rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .page {
+        grid-template-columns: 76px 1fr;
+    }
+    
+    .content {
+        padding: 1rem;
+    }
+}

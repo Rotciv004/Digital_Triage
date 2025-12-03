@@ -1,0 +1,359 @@
+@page "/register"
+@layout Components.Layout.FullScreenLayout
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using DigitalTriage.Domain.Entities
+@using DigitalTriage.Application.Contracts.Services
+@inject IPatientService PatientService
+@inject NavigationManager Nav
+
+<div class="auth-container">
+ <div class="container py-5">
+ <div class="row justify-content-center">
+ <div class="col-lg-8">
+ <div class="auth-card">
+ <div class="auth-header text-center mb-4">
+ <div class="auth-icon mb-3">
+ <i class="bi bi-person-plus"></i>
+ </div>
+ <h2 class="fw-bold mb-2">Create Your Account</h2>
+ <p class="text-muted">Join our medical triage platform</p>
+ </div>
+
+ <EditForm EditContext="_editContext" OnValidSubmit="HandleRegister" OnInvalidSubmit="HandleInvalidSubmit" FormName="registerForm">
+ <AntiforgeryToken />
+ <DataAnnotationsValidator />
+ <ValidationSummary class="alert alert-danger" />
+
+ <div class="row mb-4">
+ <div class="col-12">
+ <h5 class="section-title mb-3">
+ <i class="bi bi-person-circle me-2 text-primary"></i>Account Information
+ </h5>
+ </div>
+ </div>
+ 
+ <div class="row g-3 mb-4">
+ <div class="col-md-6">
+ <label class="form-label fw-semibold">Email Address</label>
+ <InputText class="form-control" placeholder="your.email@example.com" @bind-Value="model.Email" />
+ </div>
+ <div class="col-md-3">
+ <label class="form-label fw-semibold">Password</label>
+ <InputText type="password" class="form-control" placeholder="••••••••" @bind-Value="model.Password" />
+ </div>
+ <div class="col-md-3">
+ <label class="form-label fw-semibold">Confirm Password</label>
+ <InputText type="password" class="form-control" placeholder="••••••••" @bind-Value="model.ConfirmPassword" />
+ </div>
+ </div>
+
+ <div class="row mb-4">
+ <div class="col-12">
+ <h5 class="section-title mb-3">
+ <i class="bi bi-person-vcard me-2 text-primary"></i>Personal Information
+ </h5>
+ </div>
+ </div>
+ 
+ <div class="row g-3 mb-4">
+ <div class="col-md-4">
+ <label class="form-label fw-semibold">First Name</label>
+ <InputText class="form-control" placeholder="John" @bind-Value="model.FirstName" />
+ </div>
+ <div class="col-md-4">
+ <label class="form-label fw-semibold">Last Name</label>
+ <InputText class="form-control" placeholder="Doe" @bind-Value="model.LastName" />
+ </div>
+ <div class="col-md-4">
+ <label class="form-label fw-semibold">Phone Number</label>
+ <InputText class="form-control" placeholder="+40123456789" @bind-Value="model.PhoneNumber" />
+ </div>
+ <div class="col-md-4">
+ <label class="form-label fw-semibold">CNP</label>
+ <InputText class="form-control" placeholder="1234567890123" @bind-Value="model.Cnp" maxlength="13" />
+ </div>
+ <div class="col-md-2">
+ <label class="form-label fw-semibold">Serie</label>
+ <InputText class="form-control" placeholder="AB" @bind-Value="model.Serie" maxlength="2" />
+ </div>
+ <div class="col-md-2">
+ <label class="form-label fw-semibold">Nr</label>
+ <InputText class="form-control" placeholder="123456" @bind-Value="model.Nr" maxlength="6" />
+ </div>
+ <div class="col-md-4">
+ <label class="form-label fw-semibold">Citizenship</label>
+ <InputText class="form-control" placeholder="Romania" @bind-Value="model.Citizenship" />
+ </div>
+ </div>
+
+ <div class="row mb-4">
+ <div class="col-12">
+ <h5 class="section-title mb-3">
+ <i class="bi bi-geo-alt me-2 text-primary"></i>Place of Birth
+ </h5>
+ </div>
+ </div>
+ 
+ <div class="row g-3 mb-4">
+ <div class="col-md-4">
+ <label class="form-label fw-semibold">Country</label>
+ <InputText class="form-control" placeholder="Romania" @bind-Value="model.PlaceOfBirth.Country" />
+ </div>
+ <div class="col-md-4">
+ <label class="form-label fw-semibold">County</label>
+ <InputText class="form-control" placeholder="Cluj" @bind-Value="model.PlaceOfBirth.County" />
+ </div>
+ <div class="col-md-4">
+ <label class="form-label fw-semibold">City</label>
+ <InputText class="form-control" placeholder="Cluj-Napoca" @bind-Value="model.PlaceOfBirth.City" />
+ </div>
+ </div>
+
+ <div class="row mb-4">
+ <div class="col-12">
+ <h5 class="section-title mb-3">
+ <i class="bi bi-house me-2 text-primary"></i>Domicile Address
+ </h5>
+ </div>
+ </div>
+ 
+ <div class="row g-3 mb-4">
+ <div class="col-md-3">
+ <label class="form-label fw-semibold">Country</label>
+ <InputText class="form-control" placeholder="Romania" @bind-Value="model.Domicile.Country" />
+ </div>
+ <div class="col-md-3">
+ <label class="form-label fw-semibold">County</label>
+ <InputText class="form-control" placeholder="Cluj" @bind-Value="model.Domicile.County" />
+ </div>
+ <div class="col-md-3">
+ <label class="form-label fw-semibold">City</label>
+ <InputText class="form-control" placeholder="Cluj-Napoca" @bind-Value="model.Domicile.City" />
+ </div>
+ <div class="col-md-2">
+ <label class="form-label fw-semibold">Street</label>
+ <InputText class="form-control" placeholder="Main St" @bind-Value="model.Domicile.Street" />
+ </div>
+ <div class="col-md-1">
+ <label class="form-label fw-semibold">No.</label>
+ <InputText class="form-control" placeholder="123" @bind-Value="model.Domicile.Number" />
+ </div>
+ </div>
+ 
+ <button type="submit" class="btn btn-primary btn-lg w-100 fw-semibold">
+ <i class="bi bi-check-circle me-2"></i>Create Account
+ </button>
+ </EditForm>
+
+ @if(!string.IsNullOrEmpty(error))
+ {
+ <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+ <i class="bi bi-exclamation-triangle me-2"></i>@error
+ <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+ </div>
+ }
+
+ <div class="text-center mt-4">
+ <p class="mb-0 text-muted">
+ Already have an account? 
+ <a href="/login" class="text-primary fw-semibold text-decoration-none">Sign in here</a>
+ </p>
+ <p class="mb-0 mt-2 text-muted">
+ Are you a doctor?
+ <a href="/register/doctor" class="text-primary fw-semibold text-decoration-none">Create a doctor account</a>
+ </p>
+ </div>
+ </div>
+ </div>
+ </div>
+ </div>
+</div>
+
+@code {
+ private RegisterModel model = new();
+ private string? error;
+
+ private bool _initialized = false;
+
+ private EditContext? _editContext;
+
+ protected override void OnInitialized()
+ {
+ if (_initialized)
+ {
+ Console.WriteLine("=== Register.razor: OnInitialized called AGAIN (COMPONENT REINITIALIZED) ===");
+ Console.WriteLine($"WARNING: Component is being reinitialized! This will reset the model.");
+ Console.WriteLine($"Model state before reset - Email: '{model.Email}', FirstName: '{model.FirstName}'");
+ }
+ else
+ {
+ Console.WriteLine("=== Register.razor: OnInitialized called (FIRST TIME) ===");
+ _initialized = true;
+ }
+ Console.WriteLine($"Model initialized - Email: '{model.Email}', Password empty: {string.IsNullOrEmpty(model.Password)}");
+ 
+ // Initialize EditContext with field change tracking
+ _editContext = new EditContext(model);
+ _editContext.OnFieldChanged += (sender, e) =>
+ {
+ Console.WriteLine($"=== Field changed: {e.FieldIdentifier.FieldName} ===");
+ if (e.FieldIdentifier.FieldName == nameof(RegisterModel.Email))
+ {
+ Console.WriteLine($" Email = '{model.Email}'");
+ }
+ else if (e.FieldIdentifier.FieldName == nameof(RegisterModel.Password))
+ {
+ Console.WriteLine($" Password length = {model.Password?.Length ??0}");
+ }
+ else if (e.FieldIdentifier.FieldName == nameof(RegisterModel.ConfirmPassword))
+ {
+ Console.WriteLine($" ConfirmPassword length = {model.ConfirmPassword?.Length ??0}");
+ }
+ else
+ {
+ Console.WriteLine($" Field: {e.FieldIdentifier.FieldName}");
+ }
+ };
+ Console.WriteLine("EditContext initialized with field change tracking");
+ 
+ base.OnInitialized();
+ }
+ 
+ private void HandleInvalidSubmit(EditContext editContext)
+ {
+ Console.WriteLine("=== Register.razor: HandleInvalidSubmit CALLED (Validation FAILED) ===");
+ 
+ // Check the actual EditContext.Model values
+ if (editContext.Model is RegisterModel contextModel)
+ {
+ Console.WriteLine($"EditContext.Model values - Email: '{contextModel.Email}', FirstName: '{contextModel.FirstName}', LastName: '{contextModel.LastName}'");
+ Console.WriteLine($"EditContext.Model - Password length: {contextModel.Password?.Length ??0}, ConfirmPassword length: {contextModel.ConfirmPassword?.Length ??0}");
+ }
+ 
+ Console.WriteLine($"Direct model reference values - Email: '{model.Email}', FirstName: '{model.FirstName}', LastName: '{model.LastName}'");
+ Console.WriteLine($"Direct model - Password length: {model.Password?.Length ??0}, ConfirmPassword length: {model.ConfirmPassword?.Length ??0}");
+ Console.WriteLine($"CNP: '{model.Cnp}', Serie: '{model.Serie}', Nr: '{model.Nr}'");
+ 
+ var validationMessages = editContext.GetValidationMessages();
+ Console.WriteLine($"Validation errors count: {validationMessages.Count()}");
+ foreach (var msg in validationMessages)
+ {
+ Console.WriteLine($" Validation error: {msg}");
+ }
+ 
+ Console.WriteLine("Checking individual field validation...");
+Console.WriteLine($"Email field valid: {!editContext.GetValidationMessages(() => model.Email).Any()}");
+Console.WriteLine($"Password field valid: {!editContext.GetValidationMessages(() => model.Password!).Any()}");
+Console.WriteLine($"ConfirmPassword field valid: {!editContext.GetValidationMessages(() => model.ConfirmPassword!).Any()}");
+ 
+ // Check if model references match
+ Console.WriteLine($"Model references match: {ReferenceEquals(model, editContext.Model)}");
+ }
+
+ protected override void OnAfterRender(bool firstRender)
+ {
+ if (firstRender)
+ {
+ Console.WriteLine("=== Register.razor: First render completed ===");
+ Console.WriteLine($"Model state - Email: '{model.Email}', FirstName: '{model.FirstName}', LastName: '{model.LastName}'");
+ }
+ base.OnAfterRender(firstRender);
+ }
+
+ private bool isSubmitting = false;
+
+ private async Task HandleRegister()
+ {
+ if (isSubmitting) return;
+ 
+ isSubmitting = true;
+ try
+ {
+ Console.WriteLine("=== Register.razor: HandleRegister CALLED ===");
+ Console.WriteLine($"Form submission started - Email: '{model.Email}'");
+ Console.WriteLine($"FirstName: '{model.FirstName}', LastName: '{model.LastName}'");
+ Console.WriteLine($"Password length: {model.Password?.Length ??0}, ConfirmPassword length: {model.ConfirmPassword?.Length ??0}");
+ Console.WriteLine($"CNP: '{model.Cnp}', Serie: '{model.Serie}', Nr: '{model.Nr}'");
+ Console.WriteLine($"PlaceOfBirth - Country: '{model.PlaceOfBirth?.Country}', County: '{model.PlaceOfBirth?.County}', City: '{model.PlaceOfBirth?.City}'");
+ Console.WriteLine($"Domicile - Country: '{model.Domicile?.Country}', County: '{model.Domicile?.County}', City: '{model.Domicile?.City}', Street: '{model.Domicile?.Street}', Number: '{model.Domicile?.Number}'");
+ 
+ Console.WriteLine("Checking if email is taken...");
+ if (await PatientService.IsEmailTakenAsync(model.Email))
+ {
+ Console.WriteLine($"ERROR: Email '{model.Email}' already in use");
+ error = "Email already in use";
+ Console.WriteLine($"Model state after error - Email: '{model.Email}', FirstName: '{model.FirstName}'");
+ return;
+ }
+ Console.WriteLine("Email is available");
+ 
+ Console.WriteLine("Checking password match...");
+ if (!string.Equals(model.Password, model.ConfirmPassword))
+ {
+ Console.WriteLine($"ERROR: Passwords do not match. Password: '{model.Password}', Confirm: '{model.ConfirmPassword}'");
+ error = "Passwords do not match";
+ Console.WriteLine($"Model state after error - Email: '{model.Email}', FirstName: '{model.FirstName}'");
+ return;
+ }
+ Console.WriteLine("Passwords match");
+ 
+ Console.WriteLine("Creating patient object...");
+ var patient = new Patient
+ {
+ Email = model.Email,
+ PhoneNumber = model.PhoneNumber,
+ FirstName = model.FirstName,
+ LastName = model.LastName,
+ Cnp = model.Cnp,
+ Serie = model.Serie,
+ Nr = model.Nr,
+ Citizenship = model.Citizenship,
+ Role = "Patient",
+ PlaceOfBirth = model.PlaceOfBirth,
+ Domicile = model.Domicile
+ };
+ 
+ Console.WriteLine($"Patient object created - Email: '{patient.Email}', FirstName: '{patient.FirstName}'");
+ Console.WriteLine("Calling RegisterAsync...");
+await PatientService.RegisterAsync(patient, model.Password!);
+ Console.WriteLine("Registration successful, navigating to login...");
+ Nav.NavigateTo("/login", true);
+ }
+ catch (Exception ex)
+ {
+ error = $"Registration failed: {ex.Message}";
+ Console.WriteLine($"Registration error: {ex}");
+ }
+ finally
+ {
+ isSubmitting = false;
+ }
+ }
+
+ public class RegisterModel
+ {
+ [Required, EmailAddress]
+ public string Email { get; set; } = string.Empty;
+ [Required, MinLength(6)]
+ public string Password { get; set; } = string.Empty;
+ [Required]
+ public string ConfirmPassword { get; set; } = string.Empty;
+
+ [MaxLength(20)]
+ public string? PhoneNumber { get; set; }
+ public string? FirstName { get; set; }
+ public string? LastName { get; set; }
+ [RegularExpression("^[0-9]{13}$", ErrorMessage = "CNP must be13 digits")]
+ public string? Cnp { get; set; }
+ [RegularExpression("^[A-Za-z]{2}$", ErrorMessage = "Serie must be2 letters")]
+ public string? Serie { get; set; }
+ [RegularExpression("^[0-9]{6}$", ErrorMessage = "Nr must be6 digits")]
+ public string? Nr { get; set; }
+ public string? Citizenship { get; set; }
+ public PlaceOfBirth PlaceOfBirth { get; set; } = new();
+ public Domicile Domicile { get; set; } = new();
+ }
+}

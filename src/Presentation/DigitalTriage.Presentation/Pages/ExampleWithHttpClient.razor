@@ -1,0 +1,127 @@
+@page "/example-httpclient"
+@using System.Net.Http.Json
+@using Microsoft.JSInterop
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject AntiforgeryHelper AntiforgeryHelper
+
+<div class="container py-4">
+    <h2>Example: Using HttpClient with Antiforgery Token</h2>
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5>Method 1: Using AntiforgeryHelper (Recommended)</h5>
+            <button class="btn btn-primary" @onclick="UpdateWithHelper">Update with Helper</button>
+            <p class="mt-2 text-muted">@result1</p>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5>Method 2: Using JavaScript Interop</h5>
+            <button class="btn btn-primary" @onclick="UpdateWithJavaScript">Update with JavaScript</button>
+            <p class="mt-2 text-muted">@result2</p>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5>Method 3: Using HttpClient with Manual Header</h5>
+            <button class="btn btn-primary" @onclick="UpdateWithHttpClient">Update with HttpClient</button>
+            <p class="mt-2 text-muted">@result3</p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string? result1;
+    private string? result2;
+    private string? result3;
+
+    private async Task UpdateWithHelper()
+    {
+        try
+        {
+            var token = AntiforgeryHelper.GetToken();
+            
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/ExampleApi/update");
+            request.Headers.Add("X-CSRF-TOKEN", token);
+            request.Content = JsonContent.Create(new { Name = "Test", Value = "Data" });
+
+            var response = await Http.SendAsync(request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                result1 = "✅ Success: " + await response.Content.ReadAsStringAsync();
+            }
+            else
+            {
+                result1 = "❌ Error: " + response.StatusCode;
+            }
+        }
+        catch (Exception ex)
+        {
+            result1 = "❌ Exception: " + ex.Message;
+        }
+    }
+
+    private async Task UpdateWithJavaScript()
+    {
+        try
+        {
+            var token = await AntiforgeryHelper.FetchTokenAsync();
+            
+            if (string.IsNullOrEmpty(token))
+            {
+                result2 = "❌ Could not get antiforgery token";
+                return;
+            }
+
+            var response = await JSRuntime.InvokeAsync<object>("BlazorAntiforgery.postWithAntiforgery", 
+                "/api/ExampleApi/update", 
+                new { Name = "Test", Value = "Data" });
+
+            result2 = "✅ Success: " + response?.ToString();
+        }
+        catch (Exception ex)
+        {
+            result2 = "❌ Exception: " + ex.Message;
+        }
+    }
+
+    private async Task UpdateWithHttpClient()
+    {
+        try
+        {
+            // Get token from JavaScript
+            var token = await JSRuntime.InvokeAsync<string>("BlazorAntiforgery.fetchToken");
+            
+            if (string.IsNullOrEmpty(token))
+            {
+                result3 = "❌ Could not get antiforgery token";
+                return;
+            }
+
+            // Create request with token in header
+            Http.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
+            Http.DefaultRequestHeaders.Add("X-CSRF-TOKEN", token);
+
+            var response = await Http.PostAsJsonAsync("/api/ExampleApi/update", 
+                new { Name = "Test", Value = "Data" });
+
+            if (response.IsSuccessStatusCode)
+            {
+                result3 = "✅ Success: " + await response.Content.ReadAsStringAsync();
+            }
+            else
+            {
+                result3 = "❌ Error: " + response.StatusCode;
+            }
+        }
+        catch (Exception ex)
+        {
+            result3 = "❌ Exception: " + ex.Message;
+        }
+    }
+}
+

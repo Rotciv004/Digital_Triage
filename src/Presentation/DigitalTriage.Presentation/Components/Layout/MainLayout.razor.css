@@ -1,0 +1,82 @@
+/* Modern Vertical Sidebar Navigation */
+:root {
+    --nav-bg: #0f766e; /* teal700 */
+    --nav-bg-dark: #0b5f59;
+    --nav-accent: #f7b500;
+    --nav-text: #eaf7f6;
+    --nav-muted: #cfe8e6;
+    --active: #ffffff;
+}
+
+.page {
+    min-height: 100vh;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 260px;
+    height: 100vh;
+    z-index: 1000;
+    background: linear-gradient(180deg, var(--nav-bg), var(--nav-bg-dark));
+    color: var(--nav-text);
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+main {
+    margin-left: 260px;
+    background: #f8f9fa;
+    overflow-x: hidden;
+    min-height: 100vh;
+}
+
+.top-row {
+    border-bottom: 1px solid #e5eef4;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.content {
+    padding: 2rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 76px;
+    }
+    
+    main {
+        margin-left: 76px;
+    }
+    
+    .content {
+        padding: 1rem;
+    }
+}
+
+/* Blazor Error UI */
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }

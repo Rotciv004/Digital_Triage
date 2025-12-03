@@ -1,0 +1,994 @@
+@page "/medical-info"
+@attribute [Authorize]
+@using DigitalTriage.Presentation.Common.Helpers
+@using DigitalTriage.Domain.Entities
+@using DigitalTriage.Application.Contracts.Services
+@using System.Net.Http.Headers
+@using System.Security.Claims
+@inject IMedicalDataService MedicalDataService
+@inject IPatientService PatientService
+@inject IHospitalService HospitalService
+@inject IAuthHelper Auth
+@inject IHttpContextAccessor Http
+@inject AntiforgeryHelper Antiforgery
+@inject HttpClient HttpClient
+@inject NavigationManager Navigation
+@inject IFamilyMedicService FamilyMedicService
+@inject ILogger<MedicalInfo> _logger
+
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="page-header">
+                <h2 class="fw-bold mb-2">
+                    <i class="bi bi-heart-pulse me-2 text-danger"></i>Medical Information
+                </h2>
+                <p class="text-muted">Keep your medical records up to date</p>
+            </div>
+        </div>
+    </div>
+
+    @if (data == null)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <div class="spinner-border text-danger" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-lg-10">
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-body p-4">
+                        <EditForm Model="data" OnValidSubmit="HandleUpdate" OnInvalidSubmit="HandleInvalidSubmit" FormName="medicalInfoForm">
+                            <AntiforgeryToken />
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="alert alert-danger" />
+                            
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h5 class="section-title mb-3">
+                                        <i class="bi bi-info-circle me-2 text-danger"></i>Basic Medical Info
+                                    </h5>
+                                </div>
+                            </div>
+                            
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">
+                                        <i class="bi bi-droplet me-1"></i>Blood Type
+                                    </label>
+                                    <InputText class="form-control" placeholder="A+, O-, etc." @bind-Value="data.BloodType" />
+                                </div>
+                                <div class="col-md-9">
+                                    <label class="form-label fw-semibold">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>Allergies
+                                    </label>
+                                    <InputTextArea class="form-control" rows="2" placeholder="List any known allergies" @bind-Value="data.Allergies" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">
+                                        <i class="bi bi-heartbreak me-1"></i>Chronic Diseases
+                                    </label>
+                                    <InputTextArea class="form-control" rows="2" placeholder="Diabetes, Hypertension, etc." @bind-Value="data.ChronicDiseases" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">
+                                        <i class="bi bi-capsule me-1"></i>Current Medication
+                                    </label>
+                                    <InputTextArea class="form-control" rows="2" placeholder="Medications you're currently taking" @bind-Value="data.CurrentMedication" />
+                                </div>
+                            </div>
+
+                            <div class="border-top pt-4 mb-3">
+                                <div class="row">
+                                    <div class="col-12">
+                                        <h5 class="section-title mb-3">
+                                            <i class="bi bi-activity me-2 text-danger"></i>Symptoms & Assessment
+                                        </h5>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-4">
+                                    <div class="col-lg-6">
+                                        <label class="form-label fw-semibold">Symptoms</label>
+                                        <InputTextArea class="form-control" rows="3" placeholder="Describe current symptoms" @bind-Value="data.Symptoms" />
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <label class="form-label fw-semibold">Preliminary Diagnosis</label>
+                                        <InputTextArea class="form-control" rows="3" placeholder="Provisional diagnosis or doctor comments" @bind-Value="data.PreliminaryDiagnosis" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">
+                                            <i class="bi bi-geo-alt me-1"></i>Incident Location
+                                        </label>
+                                        <InputText class="form-control" placeholder="Where did the incident occur?" @bind-Value="data.IncidentLocation" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">
+                                            <i class="bi bi-flag me-1"></i>Triage Category
+                                        </label>
+                                        <InputText class="form-control" placeholder="Priority level label" @bind-Value="data.TriageCategory" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">ESI Triage Level</label>
+                                        <InputSelect class="form-select" @bind-Value="data.TriageLevel">
+                                            <option value="">Not set</option>
+                                            @foreach (var level in Enum.GetValues<EsiLevel>())
+                                            {
+                                                <option value="@level">@level</option>
+                                            }
+                                        </InputSelect>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">
+                                            <i class="bi bi-hourglass-split me-1"></i>Estimated Wait (minutes)
+                                        </label>
+                                        <InputNumber class="form-control" @bind-Value="data.EstimatedWaitTimeMinutes" Min="0" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="border-top pt-4 mb-3">
+                                <div class="row">
+                                    <div class="col-12">
+                                        <h5 class="section-title mb-3">
+                                            <i class="bi bi-journal-medical me-2 text-danger"></i>History & Lifestyle
+                                        </h5>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-4">
+                                    <div class="col-lg-4">
+                                        <label class="form-label fw-semibold">Personal History</label>
+                                        <InputTextArea class="form-control" rows="3" placeholder="Past medical events, surgeries, etc." @bind-Value="data.PersonalHistory" />
+                                    </div>
+                                    <div class="col-lg-4">
+                                        <label class="form-label fw-semibold">Family History</label>
+                                        <InputTextArea class="form-control" rows="3" placeholder="Relevant family medical history" @bind-Value="data.FamilyHistory" />
+                                    </div>
+                                    <div class="col-lg-4">
+                                        <label class="form-label fw-semibold">Living Conditions</label>
+                                        <InputTextArea class="form-control" rows="3" placeholder="Home environment or lifestyle notes" @bind-Value="data.LivingConditions" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="border-top pt-4 mb-3">
+                                <div class="row">
+                                    <div class="col-12">
+                                        <h5 class="section-title mb-3">
+                                            <i class="bi bi-shield-check me-2 text-danger"></i>Emergency Contact & Confidentiality
+                                        </h5>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Contact Name</label>
+                                        <InputText class="form-control" placeholder="Full name" @bind-Value="data.EmergencyContactName" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Contact Phone</label>
+                                        <InputText class="form-control" placeholder="+40 123 456 789" @bind-Value="data.EmergencyContactPhone" />
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-4 align-items-center">
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch">
+                                            <InputCheckbox class="form-check-input" @bind-Value="data.IsConfidential" />
+                                            <label class="form-check-label fw-semibold">
+                                                Mark record as confidential
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            Confidential records are only visible to you and an explicitly authorized doctor.
+                                        </small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Authorized Doctor</label>
+                                        @if (isDoctorListLoading)
+                                        {
+                                            <div class="d-flex align-items-center text-muted small">
+                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading doctors...
+                                            </div>
+                                        }
+                                        else if (!string.IsNullOrEmpty(doctorListError))
+                                        {
+                                            <div class="alert alert-warning py-2 mb-0">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>@doctorListError
+                                            </div>
+                                        }
+                                        else if (doctorOptions.Count == 0)
+                                        {
+                                            <div class="alert alert-light py-2 mb-0">
+                                                <i class="bi bi-info-circle me-1"></i>No doctors available yet. Select a preferred hospital to see its doctors.
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <InputSelect class="form-select" @bind-Value="data.AuthorizedDoctorId">
+                                                <option value="">Not assigned</option>
+                                                @foreach (var option in doctorOptions)
+                                                {
+                                                    <option value="@option.Id">@option.DisplayName</option>
+                                                }
+                                            </InputSelect>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="border-top pt-4 mb-3">
+                                <div class="row">
+                                    <div class="col-12">
+                                        <h5 class="section-title mb-3">
+                                            <i class="bi bi-person-badge me-2 text-danger"></i>Family Medic
+                                        </h5>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">
+                                            <i class="bi bi-envelope me-1"></i>Family Medic Email
+                                        </label>
+                                        <InputText class="form-control" placeholder="doctor@example.com" @bind-Value="familyMedicEmail" />
+                                        <small class="text-muted">Enter your family doctor's email address</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Status</label>
+                                        @if (familyMedicRequestStatus == "Pending")
+                                        {
+                                            <div class="alert alert-warning py-2 mb-0">
+                                                <i class="bi bi-clock-history me-1"></i>Request pending approval
+                                            </div>
+                                        }
+                                        else if (familyMedicRequestStatus == "Accepted" && patient?.FamilyMedicDoctorId.HasValue == true)
+                                        {
+                                            <div class="alert alert-success py-2 mb-0">
+                                                <i class="bi bi-check-circle me-1"></i>Family medic assigned
+                                            </div>
+                                        }
+                                        else if (familyMedicRequestStatus == "Rejected")
+                                        {
+                                            <div class="alert alert-danger py-2 mb-0">
+                                                <i class="bi bi-x-circle me-1"></i>Request was rejected
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="alert alert-light py-2 mb-0">
+                                                <i class="bi bi-info-circle me-1"></i>No family medic assigned
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(familyMedicError))
+                                {
+                                    <div class="alert alert-danger py-2 mb-3">
+                                        <i class="bi bi-exclamation-circle me-1"></i>@familyMedicError
+                                    </div>
+                                }
+
+                                <div class="d-flex gap-2 mb-3">
+                                    <button class="btn btn-primary" type="button" @onclick="HandleRequestFamilyMedic" disabled="@(isRequestingFamilyMedic || string.IsNullOrWhiteSpace(familyMedicEmail))">
+                                        @if (isRequestingFamilyMedic)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-send me-2"></i>
+                                        }
+                                        Request Family Medic
+                                    </button>
+                                    @if (patient?.FamilyMedicDoctorId.HasValue == true)
+                                    {
+                                        <button class="btn btn-outline-danger" type="button" @onclick="HandleRemoveFamilyMedic" disabled="@isRemovingFamilyMedic">
+                                            @if (isRemovingFamilyMedic)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-x-circle me-2"></i>
+                                            }
+                                            Remove Family Medic
+                                        </button>
+                                    }
+                                </div>
+
+                                <div class="border-top pt-3 mt-3">
+                                    <h6 class="fw-semibold mb-3">
+                                        <i class="bi bi-envelope-at me-2 text-danger"></i>Outlook Integration
+                                    </h6>
+                                    <p class="small text-muted mb-3">
+                                        Connect your Outlook account to send medical issues to your family medic via email.
+                                    </p>
+                                    @if (hasOutlookConnected)
+                                    {
+                                        <div class="alert alert-success py-2 mb-3">
+                                            <i class="bi bi-check-circle me-1"></i>Outlook account connected successfully
+                                        </div>
+                                        <button class="btn btn-outline-danger btn-sm" type="button" @onclick="HandleDisconnectOutlook" disabled="@isDisconnectingOutlook">
+                                            @if (isDisconnectingOutlook)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-x-circle me-1"></i>
+                                            }
+                                            Disconnect Outlook
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <div class="alert alert-warning py-2 mb-3">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>Outlook account not connected
+                                        </div>
+                                        <a class="btn btn-primary btn-sm" href="/api/outlook/connect">
+                                            <i class="bi bi-microsoft me-1"></i>Connect Outlook Account
+                                        </a>
+                                    }
+                                    @if (!string.IsNullOrEmpty(outlookError))
+                                    {
+                                        <div class="alert alert-danger py-2 mt-2 mb-0">
+                                            <i class="bi bi-exclamation-circle me-1"></i>@outlookError
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="border-top pt-4 mb-3">
+                                <div class="row">
+                                    <div class="col-12">
+                                        <h5 class="section-title mb-3">
+                                            <i class="bi bi-calendar-check me-2 text-danger"></i>Visit Information
+                                        </h5>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Last Visit Date</label>
+                                        <InputDate class="form-control" @bind-Value="data.LastVisitDate" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Created / Updated</label>
+                                        <div class="small text-muted">
+                                            <div>
+                                                <i class="bi bi-calendar-event me-1"></i>Created: @data.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")
+                                            </div>
+                                            <div>
+                                                <i class="bi bi-arrow-repeat me-1"></i>Updated: @(data.UpdatedAt?.ToLocalTime().ToString("MMM dd, yyyy HH:mm") ?? "n/a")
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button class="btn btn-danger btn-lg" type="submit">
+                                <i class="bi bi-save me-2"></i>Update Medical Information
+                            </button>
+                        </EditForm>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-paperclip me-2 text-danger"></i>Medical Attachments
+                            </h5>
+                            <div>
+                                <InputFile OnChange="HandleFileSelected" disabled="@(isUploading || data == null)" />
+                            </div>
+                        </div>
+                        <p class="text-muted small mb-3">
+                            Upload lab results, imaging reports, or other supporting documents. Maximum size @FormatFileSize(MaxFileSizeBytes).
+                        </p>
+
+                        @if (!string.IsNullOrEmpty(fileActionError))
+                        {
+                            <div class="alert alert-danger py-2">
+                                <i class="bi bi-exclamation-circle me-1"></i>@fileActionError
+                            </div>
+                        }
+
+                        @if (isUploading)
+                        {
+                            <div class="d-flex align-items-center text-muted small mb-3">
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>Uploading file...
+                            </div>
+                        }
+
+                        @if (data?.Files?.Any() == true)
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th scope="col">File</th>
+                                            <th scope="col">Uploaded</th>
+                                            <th scope="col" class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var file in data.Files.OrderByDescending(f => f.UploadDate))
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <i class="bi bi-file-earmark-text me-2 text-secondary"></i>@file.FileName
+                                                </td>
+                                                <td class="text-muted small">
+                                                    @file.UploadDate.ToLocalTime().ToString("MMM dd, yyyy HH:mm")
+                                                </td>
+                                                <td class="text-end">
+                                                    <a class="btn btn-sm btn-outline-secondary me-2" href="@GetDownloadUrl(file.Id)" target="_blank" rel="noopener">
+                                                        <i class="bi bi-download me-1"></i>Download
+                                                    </a>
+                                                    <button class="btn btn-sm btn-outline-danger" type="button" disabled="@(IsDeleting(file.Id))" @onclick="async () => await DeleteFileAsync(file.Id)">
+                                                        @if (IsDeleting(file.Id))
+                                                        {
+                                                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="d-inline-flex align-items-center">
+                                                                <i class="bi bi-trash me-1"></i>
+                                                                <span>Delete</span>
+                                                            </span>
+                                                        }
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-light text-muted mb-0">
+                                <i class="bi bi-inbox me-1"></i>No attachments uploaded yet.
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-2">
+                <div class="card shadow-sm border-0 bg-danger text-white mb-3">
+                    <div class="card-body p-3 text-center">
+                        <i class="bi bi-heart-pulse display-4 d-block mb-2"></i>
+                        <strong>Medical Records</strong>
+                    </div>
+                </div>
+                
+                <div class="card shadow-sm border-0 border-danger border-3">
+                    <div class="card-body p-3">
+                        <small class="text-muted d-block mb-2">
+                            <i class="bi bi-info-circle me-1"></i>Privacy Notice
+                        </small>
+                        <p class="mb-0 small">Your medical information is securely stored and only accessible to authorized healthcare professionals.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@if(!string.IsNullOrEmpty(message))
+{
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div class="toast show" role="alert">
+            <div class="toast-header bg-success text-white">
+                <i class="bi bi-check-circle me-2"></i>
+                <strong class="me-auto">Success</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">@message</div>
+        </div>
+    </div>
+}
+
+@code {
+    private MedicalData? data;
+    private Patient? patient;
+    private string? message;
+    private bool isDoctor;
+    private bool isDoctorListLoading;
+    private string? doctorListError;
+    private List<DoctorOption> doctorOptions = new();
+    private bool isUploading;
+    private string? fileActionError;
+    private readonly HashSet<int> deletingFileIds = new();
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+    private string? familyMedicEmail;
+    private string? familyMedicRequestStatus;
+    private bool isRequestingFamilyMedic;
+    private bool isRemovingFamilyMedic;
+    private string? familyMedicError;
+    private bool hasOutlookConnected;
+    private bool isDisconnectingOutlook;
+    private string? outlookError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("=== MedicalInfo.razor: OnInitializedAsync called ===");
+        var user = Http.HttpContext?.User ?? new ClaimsPrincipal(new ClaimsIdentity());
+        var id = Auth.GetUserId(user);
+        isDoctor = Auth.IsDoctor(user);
+
+        if (!id.HasValue)
+        {
+            Console.WriteLine("No user ID found");
+            return;
+        }
+
+        Console.WriteLine($"Loading medical data for patient ID: {id.Value}");
+        patient = await PatientService.GetByIdAsync(id.Value);
+        data = await MedicalDataService.GetByPatientIdAsync(id.Value);
+
+        if (patient != null)
+        {
+            Console.WriteLine($"Patient loaded - Preferred hospital: {patient.PreferredHospitalId}");
+        }
+
+        if (data != null)
+        {
+            Console.WriteLine($"Medical data loaded - BloodType: '{data.BloodType}', Allergies: '{data.Allergies}'");
+        }
+        else
+        {
+            Console.WriteLine("Medical data not found");
+        }
+
+        await LoadDoctorOptionsAsync();
+        await LoadFamilyMedicInfoAsync();
+        await CheckOutlookConnectionAsync();
+        
+        // Check for OAuth callback parameters
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var queryParams = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        
+        if (queryParams.ContainsKey("outlookConnected") && queryParams["outlookConnected"].ToString() == "true")
+        {
+            message = "Outlook account connected successfully!";
+            await CheckOutlookConnectionAsync();
+        }
+        else if (queryParams.ContainsKey("outlookError"))
+        {
+            var errorParam = queryParams["outlookError"].ToString();
+            outlookError = errorParam switch
+            {
+                "not_configured" => "Outlook integration is not configured. Please contact your administrator or configure Azure app registration.",
+                "auth_failed" => "Outlook authentication failed. Please try again.",
+                "no_token" => "No token received from Outlook. Please try again.",
+                "storage_failed" => "Failed to save Outlook connection. Please try again.",
+                "callback_error" => "An error occurred during Outlook connection. Please try again.",
+                _ => "An error occurred. Please try again."
+            };
+            
+            // Clear the error from URL to prevent it from showing on page refresh
+            Navigation.NavigateTo("/medical-info", replace: true);
+        }
+    }
+
+    private async Task LoadFamilyMedicInfoAsync()
+    {
+        if (patient == null)
+        {
+            return;
+        }
+
+        familyMedicEmail = patient.FamilyMedicEmail;
+        
+        var currentRequest = await FamilyMedicService.GetCurrentRequestForPatientAsync(patient.Id);
+        if (currentRequest != null)
+        {
+            familyMedicRequestStatus = currentRequest.Status;
+        }
+        else if (patient.FamilyMedicDoctorId.HasValue)
+        {
+            familyMedicRequestStatus = "Accepted";
+        }
+        else
+        {
+            familyMedicRequestStatus = null;
+        }
+    }
+
+    private async Task HandleRequestFamilyMedic()
+    {
+        if (patient == null || string.IsNullOrWhiteSpace(familyMedicEmail))
+        {
+            familyMedicError = "Please enter a valid email address";
+            return;
+        }
+
+        isRequestingFamilyMedic = true;
+        familyMedicError = null;
+
+        try
+        {
+            var request = await FamilyMedicService.RequestFamilyMedicAsync(patient.Id, familyMedicEmail);
+            familyMedicRequestStatus = request.Status;
+            message = "Family medic request sent successfully. The doctor will be notified.";
+            
+            // Reload patient to get updated info
+            patient = await PatientService.GetByIdAsync(patient.Id);
+            await LoadFamilyMedicInfoAsync();
+        }
+        catch (Exception ex)
+        {
+            familyMedicError = ex.Message;
+            _logger.LogError(ex, "Error requesting family medic");
+        }
+        finally
+        {
+            isRequestingFamilyMedic = false;
+        }
+    }
+
+    private async Task HandleRemoveFamilyMedic()
+    {
+        if (patient == null)
+        {
+            return;
+        }
+
+        isRemovingFamilyMedic = true;
+        familyMedicError = null;
+
+        try
+        {
+            var success = await FamilyMedicService.RemoveFamilyMedicAsync(patient.Id);
+            if (success)
+            {
+                message = "Family medic removed successfully.";
+                familyMedicEmail = null;
+                familyMedicRequestStatus = null;
+                
+                // Reload patient
+                patient = await PatientService.GetByIdAsync(patient.Id);
+                await LoadFamilyMedicInfoAsync();
+            }
+            else
+            {
+                familyMedicError = "Failed to remove family medic";
+            }
+        }
+        catch (Exception ex)
+        {
+            familyMedicError = ex.Message;
+            _logger.LogError(ex, "Error removing family medic");
+        }
+        finally
+        {
+            isRemovingFamilyMedic = false;
+        }
+    }
+
+    private async Task CheckOutlookConnectionAsync()
+    {
+        if (patient == null)
+        {
+            return;
+        }
+
+        var token = await FamilyMedicService.GetOutlookTokenAsync(patient.Id);
+        hasOutlookConnected = !string.IsNullOrEmpty(token);
+    }
+
+    private async Task HandleDisconnectOutlook()
+    {
+        if (patient == null)
+        {
+            return;
+        }
+
+        isDisconnectingOutlook = true;
+        outlookError = null;
+
+        try
+        {
+            var token = Antiforgery.GetToken();
+            var request = new HttpRequestMessage(HttpMethod.Post, "api/outlook/disconnect");
+            request.Headers.Add("X-CSRF-TOKEN", token);
+
+            var response = await HttpClient.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                hasOutlookConnected = false;
+                message = "Outlook account disconnected successfully.";
+            }
+            else
+            {
+                outlookError = "Failed to disconnect Outlook account. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error disconnecting Outlook");
+            outlookError = "An error occurred while disconnecting Outlook.";
+        }
+        finally
+        {
+            isDisconnectingOutlook = false;
+        }
+    }
+
+    private async Task LoadDoctorOptionsAsync()
+    {
+        doctorOptions.Clear();
+        doctorListError = null;
+
+        if (patient?.PreferredHospitalId is not int hospitalId || hospitalId <= 0)
+        {
+            Console.WriteLine("No preferred hospital set; skipping doctor list.");
+            EnsureAuthorizedDoctorOption();
+            return;
+        }
+
+        try
+        {
+            isDoctorListLoading = true;
+            var hospital = await HospitalService.GetHospitalWithDoctorsAsync(hospitalId);
+
+            if (hospital?.DoctorMemberships == null || hospital.DoctorMemberships.Count == 0)
+            {
+                Console.WriteLine("Hospital has no doctor memberships.");
+                EnsureAuthorizedDoctorOption();
+                return;
+            }
+
+            doctorOptions = hospital.DoctorMemberships
+                .Where(m => m.IsActive && m.Doctor != null && m.Doctor.User != null)
+                .Select(m => new DoctorOption
+                {
+                    Id = m.Doctor.Id,
+                    DisplayName = BuildDoctorDisplayName(m.Doctor.User, m.Doctor.Specialization)
+                })
+                .OrderBy(o => o.DisplayName)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading doctor options: {ex}");
+            doctorListError = "We couldn't load the doctor list. Please try again later.";
+        }
+        finally
+        {
+            isDoctorListLoading = false;
+            EnsureAuthorizedDoctorOption();
+        }
+    }
+
+    private void EnsureAuthorizedDoctorOption()
+    {
+        if (data?.AuthorizedDoctorId is not int doctorId || doctorId <= 0 || data.AuthorizedDoctor?.User == null)
+        {
+            return;
+        }
+
+        if (doctorOptions.All(o => o.Id != doctorId))
+        {
+            doctorOptions.Add(new DoctorOption
+            {
+                Id = doctorId,
+                DisplayName = BuildDoctorDisplayName(data.AuthorizedDoctor.User, data.AuthorizedDoctor.Specialization)
+            });
+
+            doctorOptions = doctorOptions
+                .OrderBy(o => o.DisplayName)
+                .ToList();
+        }
+    }
+
+    private void HandleInvalidSubmit(EditContext editContext)
+    {
+        Console.WriteLine("=== MedicalInfo.razor: HandleInvalidSubmit CALLED (Validation FAILED) ===");
+        if (data != null)
+        {
+            Console.WriteLine($"Medical data state - BloodType: '{data.BloodType}', Allergies: '{data.Allergies}'");
+        }
+        var validationMessages = editContext.GetValidationMessages();
+        Console.WriteLine($"Validation errors count: {validationMessages.Count()}");
+        foreach (var msg in validationMessages)
+        {
+            Console.WriteLine($"  Validation error: {msg}");
+        }
+    }
+
+    private async Task HandleUpdate()
+    {
+        Console.WriteLine("=== MedicalInfo.razor: HandleUpdate CALLED ===");
+        if (data == null)
+        {
+            Console.WriteLine("ERROR: Medical data is null");
+            return;
+        }
+
+        try
+        {
+            Console.WriteLine($"Updating medical data - BloodType: '{data.BloodType}', Allergies: '{data.Allergies}'");
+            await MedicalDataService.UpdateAsync(data);
+            Console.WriteLine("Update successful");
+            message = "Medical information updated successfully";
+            await ReloadMedicalDataAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating medical data: {ex}");
+            fileActionError = "We couldn't save your medical data. Please try again.";
+        }
+    }
+
+    private async Task ReloadMedicalDataAsync()
+    {
+        if (data == null)
+        {
+            return;
+        }
+
+        var refreshed = await MedicalDataService.GetByPatientIdAsync(data.PatientId);
+        if (refreshed != null)
+        {
+            data = refreshed;
+            EnsureAuthorizedDoctorOption();
+        }
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        fileActionError = null;
+
+        if (data == null)
+        {
+            return;
+        }
+
+        var file = e.File;
+        if (file == null)
+        {
+            return;
+        }
+
+        if (file.Size > MaxFileSizeBytes)
+        {
+            fileActionError = $"File is too large. Maximum allowed size is {FormatFileSize(MaxFileSizeBytes)}.";
+            return;
+        }
+
+        try
+        {
+            isUploading = true;
+            var token = Antiforgery.GetToken();
+
+            using var content = new MultipartFormDataContent();
+            var stream = file.OpenReadStream(MaxFileSizeBytes);
+            var streamContent = new StreamContent(stream);
+            streamContent.Headers.ContentType = MediaTypeHeaderValue.Parse(file.ContentType ?? "application/octet-stream");
+            content.Add(streamContent, "file", file.Name);
+
+            var request = new HttpRequestMessage(HttpMethod.Post, $"api/medical-files/{data.Id}/upload")
+            {
+                Content = content
+            };
+            request.Headers.Add("X-CSRF-TOKEN", token);
+
+            var response = await HttpClient.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                message = "File uploaded successfully.";
+                await ReloadMedicalDataAsync();
+            }
+            else
+            {
+                var detail = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"File upload failed: {response.StatusCode} - {detail}");
+                fileActionError = "We couldn't upload the file. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Unexpected error during upload: {ex}");
+            fileActionError = "An unexpected error occurred while uploading the file.";
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private async Task DeleteFileAsync(int fileId)
+    {
+        if (data == null || deletingFileIds.Contains(fileId))
+        {
+            return;
+        }
+
+        fileActionError = null;
+        deletingFileIds.Add(fileId);
+
+        try
+        {
+            var token = Antiforgery.GetToken();
+            var request = new HttpRequestMessage(HttpMethod.Delete, $"api/medical-files/{fileId}");
+            request.Headers.Add("X-CSRF-TOKEN", token);
+
+            var response = await HttpClient.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                message = "Attachment deleted successfully.";
+                await ReloadMedicalDataAsync();
+            }
+            else
+            {
+                var detail = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Delete failed: {response.StatusCode} - {detail}");
+                fileActionError = "We couldn't delete the file. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Unexpected error deleting file: {ex}");
+            fileActionError = "An unexpected error occurred while deleting the file.";
+        }
+        finally
+        {
+            deletingFileIds.Remove(fileId);
+        }
+    }
+
+    private bool IsDeleting(int fileId) => deletingFileIds.Contains(fileId);
+
+    private string GetDownloadUrl(int fileId) => Navigation.BaseUri.TrimEnd('/') + $"/api/medical-files/download/{fileId}";
+
+    private static string BuildDoctorDisplayName(Patient user, string? specialization)
+    {
+        var name = $"{user.FirstName ?? string.Empty} {user.LastName ?? string.Empty}".Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = user.Email ?? "Doctor";
+        }
+
+        if (!string.IsNullOrWhiteSpace(specialization))
+        {
+            return $"{name} — {specialization}";
+        }
+
+        return name;
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        const long KB = 1024;
+        const long MB = KB * 1024;
+
+        if (bytes >= MB)
+        {
+            return $"{bytes / (double)MB:0.##} MB";
+        }
+
+        if (bytes >= KB)
+        {
+            return $"{bytes / (double)KB:0} KB";
+        }
+
+        return $"{bytes} bytes";
+    }
+
+    private class DoctorOption
+    {
+        public int Id { get; set; }
+        public string DisplayName { get; set; } = string.Empty;
+    }
+}

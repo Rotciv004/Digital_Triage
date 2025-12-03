@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- EF Core Design Package - REQUIRED FOR MIGRATIONS -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    
+    <!-- Existing packages -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Cookies" Version="2.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" Version="8.0.10" />
+    <PackageReference Include="Microsoft.Graph" Version="5.62.0" />
+    <!-- Add any other existing packages here -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Infrastructure\DigitalTriage.Infrastructure\DigitalTriage.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Application\DigitalTriage.Application\DigitalTriage.Application.csproj" />
+    <ProjectReference Include="..\..\Domain\DigitalTriage.Domain\DigitalTriage.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
+

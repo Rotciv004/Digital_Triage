@@ -1,0 +1,290 @@
+﻿@page "/"
+@layout Components.Layout.FullScreenLayout
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+
+<div class="landing-page">
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="container">
+            <div class="row align-items-center min-vh-100 py-5">
+                <div class="col-lg-6 mb-5 mb-lg-0">
+                    <div class="hero-content">
+                        <h1 class="display-4 fw-bold mb-4">
+                            <span class="text-gradient">Digital Medical Triage</span>
+                        </h1>
+                        <p class="lead mb-4 text-muted">
+                            Advanced AI-powered triage system for rapid patient assessment and care prioritization.
+                            Built with Blazor Server and modern healthcare standards.
+                        </p>
+                        <div class="d-flex flex-wrap gap-3 mb-4">
+                            <a class="btn btn-primary btn-lg px-4" href="/register">
+                                <i class="bi bi-person-plus me-2"></i>Get Started
+                            </a>
+                            <a class="btn btn-outline-primary btn-lg px-4" href="/login">
+                                <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                            </a>
+                        </div>
+                        <div class="feature-highlights">
+                            <div class="row g-3">
+                                <div class="col-6 col-md-4">
+                                    <div class="feature-item">
+                                        <i class="bi bi-shield-check text-primary"></i>
+                                        <small class="d-block">Secure</small>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <div class="feature-item">
+                                        <i class="bi bi-speedometer2 text-success"></i>
+                                        <small class="d-block">Fast</small>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <div class="feature-item">
+                                        <i class="bi bi-robot text-info"></i>
+                                        <small class="d-block">AI Powered</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="hero-visual">
+                        <div class="floating-card card-1">
+                            <i class="bi bi-heart-pulse"></i>
+                            <div>Medical Records</div>
+                        </div>
+                        <div class="floating-card card-2">
+                            <i class="bi bi-robot"></i>
+                            <div>AI Triage</div>
+                        </div>
+                        <div class="floating-card card-3">
+                            <i class="bi bi-people"></i>
+                            <div>Patient Care</div>
+                        </div>
+                        <div class="center-circle">
+                            <i class="bi bi-hospital"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section py-5">
+        <div class="container">
+            <div class="text-center mb-5">
+                <h2 class="fw-bold mb-3">Key Features</h2>
+                <p class="text-muted">Everything you need for modern medical triage</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="feature-card text-center p-4 h-100">
+                        <div class="feature-icon mb-3">
+                            <i class="bi bi-person-vcard"></i>
+                        </div>
+                        <h5 class="fw-bold">Patient Management</h5>
+                        <p class="text-muted">Comprehensive patient profiles with personal and medical information</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card text-center p-4 h-100">
+                        <div class="feature-icon mb-3">
+                            <i class="bi bi-clipboard-pulse"></i>
+                        </div>
+                        <h5 class="fw-bold">Issue Tracking</h5>
+                        <p class="text-muted">Track and monitor patient-reported issues in real-time</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card text-center p-4 h-100">
+                        <div class="feature-icon mb-3">
+                            <i class="bi bi-robot"></i>
+                        </div>
+                        <h5 class="fw-bold">AI Triage Assistant</h5>
+                        <p class="text-muted">Get instant preliminary assessment recommendations</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Info Banner -->
+    <section class="info-banner py-4">
+        <div class="container">
+            <div class="alert alert-info border-0 mb-0">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-info-circle fs-3 me-3"></i>
+                    <div>
+                        <strong>Note:</strong> AI Triage is currently in preview mode (UI prototype without active AI backend integration).
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<style>
+    .landing-page {
+        min-height: 100vh;
+    }
+
+    .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .text-gradient {
+        background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.9) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .hero-visual {
+        position: relative;
+        height: 400px;
+    }
+
+    .floating-card {
+        position: absolute;
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        text-align: center;
+        color: #667eea;
+        font-weight: 600;
+        animation: float 3s ease-in-out infinite;
+    }
+
+    .floating-card i {
+        font-size: 2rem;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .card-1 {
+        top: 10%;
+        left: 0;
+        animation-delay: 0s;
+    }
+
+    .card-2 {
+        top: 50%;
+        right: 10%;
+        animation-delay: 1s;
+    }
+
+    .card-3 {
+        bottom: 20%;
+        left: 20%;
+        animation-delay: 2s;
+    }
+
+    .center-circle {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 150px;
+        height: 150px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(10px);
+        border: 3px solid rgba(255,255,255,0.3);
+    }
+
+    .center-circle i {
+        font-size: 4rem;
+        color: white;
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0);
+        }
+        50% {
+            transform: translateY(-20px);
+        }
+    }
+
+    .features-section {
+        background: white;
+    }
+
+    .feature-card {
+        background: white;
+        border-radius: 12px;
+        border: 2px solid #f8f9fa;
+        transition: all 0.3s ease;
+    }
+
+    .feature-card:hover {
+        border-color: #667eea;
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.1);
+    }
+
+    .feature-icon {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        color: white;
+        font-size: 2rem;
+    }
+
+    .feature-item {
+        text-align: center;
+        color: white;
+    }
+
+    .feature-item i {
+        font-size: 1.5rem;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .info-banner {
+        background: #f8f9fa;
+    }
+
+    .alert-info {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        border: none;
+        border-radius: 12px;
+    }
+
+    @@media (max-width: 768px) {
+        .hero-visual {
+            height: 300px;
+        }
+
+        .floating-card {
+            padding: 1rem;
+        }
+
+        .floating-card i {
+            font-size: 1.5rem;
+        }
+
+        .center-circle {
+            width: 100px;
+            height: 100px;
+        }
+
+        .center-circle i {
+            font-size: 2.5rem;
+        }
+    }
+</style>

@@ -1,0 +1,483 @@
+@page "/ai-triage"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using DigitalTriage.Presentation.Common.Helpers
+@using DigitalTriage.Application.Contracts.Services
+@using DigitalTriage.Domain.Entities
+@using System.Security.Claims
+@inject IPatientService PatientService
+@inject IFamilyMedicService FamilyMedicService
+@inject IEmailService EmailService
+@inject IPatientIssueService PatientIssueService
+@inject IAiTriageService AiTriageService
+@inject IAuthHelper Auth
+@inject IHttpContextAccessor Http
+@inject ILogger<AiChat> Logger
+@inject IConfiguration Configuration
+@inject IJSRuntime JSRuntime
+
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="page-header">
+                <h2 class="fw-bold mb-2">
+                    <i class="bi bi-robot me-2 text-info"></i>AI Triage Assistant
+                </h2>
+                <p class="text-muted">Get instant medical triage recommendations</p>
+            </div>
+        </div>
+    </div>
+
+    @if (!isGeminiConfigured)
+    {
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Configuration Required:</strong> Gemini API key not configured. Please add your API key to appsettings.json.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0" style="height: 600px; display: flex; flex-direction: column;">
+      <div class="card-body p-4" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+         <div class="d-flex justify-content-between align-items-center mb-3 flex-shrink-0">
+     <h5 class="card-title mb-0">
+        <i class="bi bi-chat-dots me-2 text-info"></i>Chat with AI Assistant
+       </h5>
+  @if (currentSession?.IsActive == true)
+        {
+           <button class="btn btn-sm btn-outline-danger" @onclick="HandleEndSession">
+   <i class="bi bi-x-circle me-1"></i>End Session
+          </button>
+            }
+        </div>
+    
+  <div class="chat-container flex-grow-1 overflow-auto mb-3 bg-light rounded p-3" style="min-height: 0; max-height: 100%;" @ref="chatContainer">
+  @if (isLoadingSession)
+    {
+   <div class="text-center py-5">
+         <div class="spinner-border text-info" role="status">
+         <span class="visually-hidden">Loading...</span>
+          </div>
+     </div>
+      }
+     else if (currentSession != null)
+  {
+         @foreach (var msg in currentSession.Messages)
+         {
+          if (msg.Role == "assistant" || msg.Role == "model")
+                 {
+           <div class="d-flex mb-3">
+        <div class="flex-shrink-0">
+  <div class="avatar bg-info text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+         <i class="bi bi-robot"></i>
+    </div>
+    </div>
+   <div class="flex-grow-1 ms-3">
+      <div class="chat-bubble bg-white rounded-3 p-3 shadow-sm">
+              <strong class="text-info">AI Assistant</strong>
+ <div class="mb-0 mt-2" style="white-space: pre-wrap;">@msg.Content</div>
+      </div>
+          </div>
+            </div>
+       }
+         else
+  {
+           <div class="d-flex justify-content-end mb-3">
+            <div class="flex-grow-1 me-3 text-end">
+              <div class="chat-bubble bg-info text-white rounded-3 p-3">
+<strong>You</strong>
+           <div class="mb-0 mt-2" style="white-space: pre-wrap;">@msg.Content</div>
+         </div>
+           </div>
+              <div class="flex-shrink-0">
+             <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+          <i class="bi bi-person"></i>
+           </div>
+      </div>
+         </div>
+     }
+     }
+              
+           @if (isSendingMessage)
+           {
+  <div class="d-flex mb-3">
+        <div class="flex-shrink-0">
+    <div class="avatar bg-info text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+     <i class="bi bi-robot"></i>
+   </div>
+             </div>
+       <div class="flex-grow-1 ms-3">
+        <div class="chat-bubble bg-white rounded-3 p-3 shadow-sm">
+        <div class="typing-indicator">
+       <span></span>
+          <span></span>
+   <span></span>
+     </div>
+          </div>
+       </div>
+          </div>
+       }
+           }
+           </div>
+        
+      <div class="flex-shrink-0">
+       <EditForm Model="messageInput" OnValidSubmit="HandleSendMessage" FormName="chatForm">
+          <AntiforgeryToken />
+        <div class="input-group">
+     <InputText class="form-control form-control-lg" 
+        placeholder="Type your message..." 
+          @bind-Value="messageInput.Text" 
+    disabled="@(!isGeminiConfigured || isSendingMessage || currentSession == null || !currentSession.IsActive)" />
+       <button class="btn btn-info btn-lg" 
+             type="submit" 
+ disabled="@(!isGeminiConfigured || isSendingMessage || string.IsNullOrWhiteSpace(messageInput.Text) || currentSession == null || !currentSession.IsActive)">
+          @if (isSendingMessage)
+           {
+      <span class="spinner-border spinner-border-sm" role="status"></span>
+    }
+  else
+  {
+     <i class="bi bi-send"></i>
+             }
+  </button>
+        </div>
+      </EditForm>
+       </div>
+          </div>
+          </div>
+</div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold mb-3">
+                        <i class="bi bi-info-circle me-2 text-info"></i>How it works
+                    </h6>
+                    <ul class="list-unstyled">
+                        <li class="mb-3">
+                            <i class="bi bi-1-circle text-info me-2"></i>
+                            Describe your symptoms
+                        </li>
+                        <li class="mb-3">
+                            <i class="bi bi-2-circle text-info me-2"></i>
+                            AI analyzes the information
+                        </li>
+                        <li class="mb-0">
+                            <i class="bi bi-3-circle text-info me-2"></i>
+                            Receive triage recommendations
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            @if (currentSession?.Severity != null)
+            {
+                var severityClass = currentSession.Severity switch
+                {
+                    "Low" => "success",
+                    "Moderate" => "warning",
+                    "High" => "orange",
+                    "Critical" => "danger",
+                    _ => "secondary"
+                };
+
+                <div class="card shadow-sm border-0 border-@severityClass border-3 mb-3">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold mb-3">
+                            <i class="bi bi-clipboard-pulse me-2"></i>Assessment
+                        </h6>
+                        <div class="mb-2">
+                            <strong>Severity:</strong>
+                            <span class="badge bg-@severityClass ms-2">@currentSession.Severity</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(currentSession.RecommendedAction))
+                        {
+                            <div class="mt-3">
+                                <strong>Recommendation:</strong>
+                                <p class="mb-0 mt-1">@currentSession.RecommendedAction</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="card shadow-sm border-0 border-info border-3">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold mb-3">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Important Notice
+                    </h6>
+                    <p class="small mb-0">AI triage is a preliminary assessment tool and should not replace professional medical advice. For emergencies, call your local emergency number.</p>
+                </div>
+            </div>
+
+            @if (hasFamilyMedic && currentSession?.IsEmergency == false && currentSession?.Severity != null)
+            {
+                <div class="card shadow-sm border-0 border-success border-3 mt-3">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold mb-3">
+                            <i class="bi bi-envelope-paper me-2 text-success"></i>Send to Family Medic
+                        </h6>
+                        <p class="small mb-3">This assessment suggests non-emergency care. You can send this information to your family medic for review.</p>
+                        <button class="btn btn-success btn-sm w-100" @onclick="HandleSendToFamilyMedic" disabled="@isSendingToFamilyMedic">
+                            @if (isSendingToFamilyMedic)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-send me-2"></i>
+                            }
+                            Send to Family Medic
+                        </button>
+                        @if (!string.IsNullOrEmpty(sendToFamilyMedicError))
+                        {
+                            <div class="alert alert-danger py-2 mt-2 mb-0">
+                                <i class="bi bi-exclamation-circle me-1"></i>@sendToFamilyMedicError
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(sendToFamilyMedicSuccess))
+                        {
+                            <div class="alert alert-success py-2 mt-2 mb-0">
+                                <i class="bi bi-check-circle me-1"></i>@sendToFamilyMedicSuccess
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .typing-indicator {
+        display: flex;
+        gap: 4px;
+        padding: 8px 0;
+    }
+
+    .typing-indicator span {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #6c757d;
+        animation: typing 1.4s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .typing-indicator span:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    @@keyframes typing {
+        0%, 60%, 100% {
+            transform: translateY(0);
+            opacity: 0.7;
+        }
+        30% {
+            transform: translateY(-10px);
+            opacity: 1;
+        }
+    }
+
+    .border-orange {
+        border-color: #fd7e14 !important;
+    }
+
+    .bg-orange {
+        background-color: #fd7e14 !important;
+    }
+</style>
+
+@code {
+    private Patient? patient;
+    private bool hasFamilyMedic;
+    private bool isEmergency = false; // In real implementation, this would be determined by AI
+    private bool isSendingToFamilyMedic;
+    private string? sendToFamilyMedicError;
+    private string? sendToFamilyMedicSuccess;
+
+    private TriageSessionDto? currentSession;
+    private bool isLoadingSession = true;
+    private bool isSendingMessage;
+    private bool isGeminiConfigured;
+    private MessageInput messageInput = new();
+    private ElementReference chatContainer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = Http.HttpContext?.User ?? new ClaimsPrincipal(new ClaimsIdentity());
+        var userId = Auth.GetUserId(user);
+
+        // Check if Gemini is configured
+        var apiKey = Configuration["Gemini:ApiKey"];
+        isGeminiConfigured = !string.IsNullOrWhiteSpace(apiKey);
+        
+        if (userId.HasValue)
+        {
+            patient = await PatientService.GetByIdAsync(userId.Value);
+            hasFamilyMedic = patient?.FamilyMedicDoctorId.HasValue == true;
+            
+            // Load or create active session
+            currentSession = await AiTriageService.GetActiveSessionAsync(userId.Value);
+            if (currentSession == null && isGeminiConfigured)
+            {
+                currentSession = await AiTriageService.StartSessionAsync(userId.Value);
+            }
+        }
+        
+        isLoadingSession = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Auto-scroll to bottom of chat
+        if (currentSession?.Messages?.Count > 0)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("scrollToBottom", chatContainer);
+            }
+            catch (JSException ex)
+            {
+                // JS function not loaded yet, ignore
+                Logger.LogWarning(ex, "scrollToBottom function not available");
+            }
+            catch (Exception ex)
+            {
+                // Other errors, log but don't crash
+                Logger.LogWarning(ex, "Could not scroll chat to bottom");
+            }
+        }
+    }
+
+    private async Task HandleSendMessage()
+    {
+        if (currentSession == null || string.IsNullOrWhiteSpace(messageInput.Text))
+            return;
+
+        isSendingMessage = true;
+        var messageText = messageInput.Text;
+        messageInput.Text = string.Empty;
+
+        try
+        {
+            var response = await AiTriageService.SendMessageAsync(currentSession.Id, messageText);
+            
+            // Update current session with new messages
+            currentSession.Messages.Add(response.UserMessage);
+            currentSession.Messages.Add(response.AssistantMessage);
+            currentSession.Severity = response.Severity;
+            currentSession.IsEmergency = response.IsEmergency;
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error sending message");
+            sendToFamilyMedicError = "Failed to send message. Please try again.";
+        }
+        finally
+        {
+            isSendingMessage = false;
+        }
+    }
+
+    private async Task HandleEndSession()
+    {
+        if (currentSession == null) return;
+
+        await AiTriageService.EndSessionAsync(currentSession.Id);
+        currentSession.IsActive = false;
+        StateHasChanged();
+    }
+
+    private async Task HandleSendToFamilyMedic()
+    {
+        if (patient == null || string.IsNullOrEmpty(patient.FamilyMedicEmail) || currentSession == null)
+        {
+            sendToFamilyMedicError = "No family medic assigned or no active session.";
+            return;
+        }
+
+        isSendingToFamilyMedic = true;
+        sendToFamilyMedicError = null;
+        sendToFamilyMedicSuccess = null;
+
+        try
+        {
+            // Get Outlook token
+            var outlookToken = await FamilyMedicService.GetOutlookTokenAsync(patient.Id);
+            
+            if (string.IsNullOrEmpty(outlookToken))
+            {
+                sendToFamilyMedicError = "Please connect your Outlook account first. Go to Medical Information page to set up Outlook integration.";
+                return;
+            }
+
+            // Prepare issue data from chat session
+            var conversationSummary = string.Join("\n\n", currentSession.Messages.Select(m => 
+                $"[{m.Role.ToUpper()}]: {m.Content}"));
+
+            var issueTitle = $"AI Triage Assessment - {currentSession.Severity ?? "Unknown"} Severity";
+            var issueDescription = $"AI Triage Session Summary:\n\n{conversationSummary}\n\n" +
+                                 $"Severity: {currentSession.Severity ?? "Not assessed"}\n" +
+                                 $"Recommendation: {currentSession.RecommendedAction ?? "None provided"}";
+
+            // Map severity to emergency grade (1-5)
+            int? emergencyGrade = currentSession.Severity switch
+            {
+                "Critical" => 1,
+                "High" => 2,
+                "Moderate" => 3,
+                "Low" => 4,
+                _ => 5
+            };
+
+            // Send email via Outlook
+            var success = await EmailService.SendProblemToFamilyMedicAsync(
+                patient.Email,
+                patient.FamilyMedicEmail,
+                outlookToken,
+                issueTitle,
+                issueDescription,
+                "AI Triage Assessment",
+                emergencyGrade);
+
+            if (success)
+            {
+                // Also create a patient issue for tracking
+                await PatientIssueService.CreateAsync(
+                    patient.Id,
+                    issueTitle,
+                    issueDescription,
+                    "AI Triage Assessment",
+                    emergencyGrade);
+
+                sendToFamilyMedicSuccess = "Assessment sent to your family medic successfully.";
+            }
+            else
+            {
+                sendToFamilyMedicError = "Failed to send email. Please try again or contact your family medic directly.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error sending assessment to family medic");
+            sendToFamilyMedicError = "An error occurred while sending to your family medic. Please try again.";
+        }
+        finally
+        {
+            isSendingToFamilyMedic = false;
+        }
+    }
+
+    private class MessageInput
+    {
+        public string Text { get; set; } = string.Empty;
+    }
+}

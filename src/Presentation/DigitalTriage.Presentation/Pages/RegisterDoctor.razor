@@ -1,0 +1,174 @@
+@page "/register/doctor"
+@layout Components.Layout.FullScreenLayout
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using DigitalTriage.Domain.Entities
+@using DigitalTriage.Application.Contracts.Services
+@inject IPatientService PatientService
+@inject NavigationManager Nav
+
+<div class="auth-container">
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <div class="auth-card">
+                    <div class="auth-header text-center mb-4">
+                        <div class="auth-icon mb-3">
+                            <i class="bi bi-stethoscope"></i>
+                        </div>
+                        <h2 class="fw-bold mb-2">Create Doctor Account</h2>
+                        <p class="text-muted">Access hospital management and triage tools</p>
+                    </div>
+
+                    <EditForm Model="model" OnValidSubmit="HandleRegister" FormName="doctorRegisterForm">
+                        <AntiforgeryToken />
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="alert alert-danger" />
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">First Name</label>
+                                <InputText class="form-control" placeholder="John" @bind-Value="model.FirstName" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Last Name</label>
+                                <InputText class="form-control" placeholder="Doe" @bind-Value="model.LastName" />
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">Email Address</label>
+                            <InputText class="form-control" placeholder="name@hospital.com" @bind-Value="model.Email" />
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Password</label>
+                                <InputText type="password" class="form-control" placeholder="••••••••" @bind-Value="model.Password" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Confirm Password</label>
+                                <InputText type="password" class="form-control" placeholder="••••••••" @bind-Value="model.ConfirmPassword" />
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">Medical Specialization</label>
+                            <InputText class="form-control" placeholder="Cardiologist, Surgeon, etc." @bind-Value="model.Specialization" />
+                        </div>
+
+                        <button class="btn btn-success btn-lg w-100 fw-semibold" type="submit" disabled="@isSubmitting">
+                            @if (isSubmitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <span>Creating account...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-check-circle me-2"></i><span>Create Doctor Account</span>
+                            }
+                        </button>
+                    </EditForm>
+
+                    @if (!string.IsNullOrEmpty(error))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                            <i class="bi bi-exclamation-triangle me-2"></i>@error
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    <div class="text-center mt-4">
+                        <p class="mb-0 text-muted">
+                            Looking to register as a patient?
+                            <a href="/register" class="text-primary fw-semibold text-decoration-none">Sign up here</a>
+                        </p>
+                        <p class="mb-0 mt-2 text-muted">
+                            Already have an account?
+                            <a href="/login" class="text-primary fw-semibold text-decoration-none">Sign in here</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private DoctorRegisterModel model = new();
+    private string? error;
+    private bool isSubmitting;
+
+    private async Task HandleRegister()
+    {
+        if (isSubmitting)
+        {
+            return;
+        }
+
+        error = null;
+
+        try
+        {
+            isSubmitting = true;
+
+            if (await PatientService.IsEmailTakenAsync(model.Email))
+            {
+                error = "Email already in use.";
+                return;
+            }
+
+            if (!string.Equals(model.Password, model.ConfirmPassword, StringComparison.Ordinal))
+            {
+                error = "Passwords do not match.";
+                return;
+            }
+
+            var doctor = new Patient
+            {
+                Email = model.Email,
+                FirstName = model.FirstName,
+                LastName = model.LastName,
+                Role = "Doctor",
+                DoctorProfile = new DoctorProfile
+                {
+                    Specialization = model.Specialization
+                }
+            };
+
+            await PatientService.RegisterAsync(doctor, model.Password);
+            Nav.NavigateTo("/login", true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Doctor registration failed: {ex}");
+            error = "We couldn't create the doctor account. Please try again.";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private class DoctorRegisterModel
+    {
+        [Required, MaxLength(100)]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required, MaxLength(100)]
+        public string LastName { get; set; } = string.Empty;
+
+        [Required, EmailAddress, MaxLength(200)]
+        public string Email { get; set; } = string.Empty;
+
+        [Required, MinLength(6)]
+        public string Password { get; set; } = string.Empty;
+
+        [Required]
+        public string ConfirmPassword { get; set; } = string.Empty;
+
+        [Required, MaxLength(150)]
+        public string Specialization { get; set; } = string.Empty;
+    }
+}
+
