@@ -32,7 +32,7 @@
     {
         <div class="alert alert-warning alert-dismissible fade show" role="alert">
             <i class="bi bi-exclamation-triangle me-2"></i>
-            <strong>Configuration Required:</strong> Gemini API key not configured. Please add your API key to appsettings.json.
+            <strong>Configuration Required:</strong> Custom AI endpoint not configured. Please add your endpoint URL to appsettings.json.
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
@@ -200,7 +200,7 @@
                             </div>
                         }
                     </div>
-                </div>
+                </div>      
             }
 
             <div class="card shadow-sm border-0 border-info border-3">
@@ -227,6 +227,9 @@
                             }
                             else
                             {
+                                            
+                            }
+                            {   
                                 <i class="bi bi-send me-2"></i>
                             }
                             Send to Family Medic
@@ -313,94 +316,94 @@
         var user = Http.HttpContext?.User ?? new ClaimsPrincipal(new ClaimsIdentity());
         var userId = Auth.GetUserId(user);
 
-        // Check if Gemini is configured
-        var apiKey = Configuration["Gemini:ApiKey"];
-        isGeminiConfigured = !string.IsNullOrWhiteSpace(apiKey);
+        // Check if Custom AI is configured
+        var customAiEndpoint = Configuration["CustomAI:Endpoint"];
+        isGeminiConfigured = !string.IsNullOrWhiteSpace(customAiEndpoint);
         
         if (userId.HasValue)
         {
             patient = await PatientService.GetByIdAsync(userId.Value);
-            hasFamilyMedic = patient?.FamilyMedicDoctorId.HasValue == true;
-            
-            // Load or create active session
-            currentSession = await AiTriageService.GetActiveSessionAsync(userId.Value);
-            if (currentSession == null && isGeminiConfigured)
-            {
-                currentSession = await AiTriageService.StartSessionAsync(userId.Value);
-            }
-        }
+     hasFamilyMedic = patient?.FamilyMedicDoctorId.HasValue == true;
+   
+         // Load or create active session
+        currentSession = await AiTriageService.GetActiveSessionAsync(userId.Value);
+     if (currentSession == null && isGeminiConfigured)
+            {           
+    currentSession = await AiTriageService.StartSessionAsync(userId.Value);
+      }
+    }
         
         isLoadingSession = false;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Auto-scroll to bottom of chat
+// Auto-scroll to bottom of chat
         if (currentSession?.Messages?.Count > 0)
         {
             try
-            {
-                await JSRuntime.InvokeVoidAsync("scrollToBottom", chatContainer);
-            }
-            catch (JSException ex)
-            {
-                // JS function not loaded yet, ignore
-                Logger.LogWarning(ex, "scrollToBottom function not available");
-            }
+  {
+         await JSRuntime.InvokeVoidAsync("scrollToBottom", chatContainer);
+   }
+      catch (JSException ex)
+ {
+          // JS function not loaded yet, ignore
+        Logger.LogWarning(ex, "scrollToBottom function not available");
+         }
             catch (Exception ex)
-            {
-                // Other errors, log but don't crash
-                Logger.LogWarning(ex, "Could not scroll chat to bottom");
-            }
+      {
+        // Other errors, log but don't crash
+          Logger.LogWarning(ex, "Could not scroll chat to bottom");
+      }
         }
     }
 
     private async Task HandleSendMessage()
     {
         if (currentSession == null || string.IsNullOrWhiteSpace(messageInput.Text))
-            return;
+      return;
 
         isSendingMessage = true;
         var messageText = messageInput.Text;
-        messageInput.Text = string.Empty;
+    messageInput.Text = string.Empty;
 
-        try
+ try
         {
             var response = await AiTriageService.SendMessageAsync(currentSession.Id, messageText);
-            
-            // Update current session with new messages
-            currentSession.Messages.Add(response.UserMessage);
-            currentSession.Messages.Add(response.AssistantMessage);
-            currentSession.Severity = response.Severity;
-            currentSession.IsEmergency = response.IsEmergency;
-            
-            StateHasChanged();
+      
+   // Update current session with new messages
+         currentSession.Messages.Add(response.UserMessage);
+ currentSession.Messages.Add(response.AssistantMessage);
+ currentSession.Severity = response.Severity;
+       currentSession.IsEmergency = response.IsEmergency;
+      
+       StateHasChanged();
         }
-        catch (Exception ex)
+catch (Exception ex)
         {
             Logger.LogError(ex, "Error sending message");
-            sendToFamilyMedicError = "Failed to send message. Please try again.";
+     sendToFamilyMedicError = "Failed to send message. Please try again.";
         }
-        finally
+   finally
         {
-            isSendingMessage = false;
+   isSendingMessage = false;
         }
     }
 
     private async Task HandleEndSession()
     {
-        if (currentSession == null) return;
+   if (currentSession == null) return;
 
         await AiTriageService.EndSessionAsync(currentSession.Id);
         currentSession.IsActive = false;
         StateHasChanged();
     }
 
-    private async Task HandleSendToFamilyMedic()
+private async Task HandleSendToFamilyMedic()
     {
         if (patient == null || string.IsNullOrEmpty(patient.FamilyMedicEmail) || currentSession == null)
         {
-            sendToFamilyMedicError = "No family medic assigned or no active session.";
+      sendToFamilyMedicError = "No family medic assigned or no active session.";
             return;
         }
 
@@ -410,69 +413,69 @@
 
         try
         {
-            // Get Outlook token
-            var outlookToken = await FamilyMedicService.GetOutlookTokenAsync(patient.Id);
+      // Get Outlook token
+ var outlookToken = await FamilyMedicService.GetOutlookTokenAsync(patient.Id);
             
             if (string.IsNullOrEmpty(outlookToken))
             {
-                sendToFamilyMedicError = "Please connect your Outlook account first. Go to Medical Information page to set up Outlook integration.";
-                return;
+         sendToFamilyMedicError = "Please connect your Outlook account first. Go to Medical Information page to set up Outlook integration.";
+   return;
             }
 
-            // Prepare issue data from chat session
+  // Prepare issue data from chat session
             var conversationSummary = string.Join("\n\n", currentSession.Messages.Select(m => 
-                $"[{m.Role.ToUpper()}]: {m.Content}"));
+              $"[{m.Role.ToUpper()}]: {m.Content}"));
 
-            var issueTitle = $"AI Triage Assessment - {currentSession.Severity ?? "Unknown"} Severity";
-            var issueDescription = $"AI Triage Session Summary:\n\n{conversationSummary}\n\n" +
-                                 $"Severity: {currentSession.Severity ?? "Not assessed"}\n" +
-                                 $"Recommendation: {currentSession.RecommendedAction ?? "None provided"}";
+      var issueTitle = $"AI Triage Assessment - {currentSession.Severity ?? "Unknown"} Severity";
+    var issueDescription = $"AI Triage Session Summary:\n\n{conversationSummary}\n\n" +
+            $"Severity: {currentSession.Severity ?? "Not assessed"}\n" +
+            $"Recommendation: {currentSession.RecommendedAction ?? "None provided"}";
 
-            // Map severity to emergency grade (1-5)
-            int? emergencyGrade = currentSession.Severity switch
-            {
-                "Critical" => 1,
-                "High" => 2,
-                "Moderate" => 3,
-                "Low" => 4,
-                _ => 5
+    // Map severity to emergency grade (1-5)
+   int? emergencyGrade = currentSession.Severity switch
+   {
+       "Critical" => 1,
+            "High" => 2,
+             "Moderate" => 3,
+    "Low" => 4,
+ _ => 5
             };
 
             // Send email via Outlook
-            var success = await EmailService.SendProblemToFamilyMedicAsync(
-                patient.Email,
-                patient.FamilyMedicEmail,
-                outlookToken,
+   var success = await EmailService.SendProblemToFamilyMedicAsync(
+     patient.Email,
+        patient.FamilyMedicEmail,
+  outlookToken,
                 issueTitle,
-                issueDescription,
-                "AI Triage Assessment",
-                emergencyGrade);
+     issueDescription,
+        "AI Triage Assessment",
+     emergencyGrade);
 
             if (success)
             {
-                // Also create a patient issue for tracking
-                await PatientIssueService.CreateAsync(
-                    patient.Id,
-                    issueTitle,
-                    issueDescription,
-                    "AI Triage Assessment",
-                    emergencyGrade);
+       // Also create a patient issue for tracking
+     await PatientIssueService.CreateAsync(
+      patient.Id,
+  issueTitle,
+       issueDescription,
+                "AI Triage Assessment",
+  emergencyGrade);
 
-                sendToFamilyMedicSuccess = "Assessment sent to your family medic successfully.";
-            }
-            else
-            {
-                sendToFamilyMedicError = "Failed to send email. Please try again or contact your family medic directly.";
+          sendToFamilyMedicSuccess = "Assessment sent to your family medic successfully.";
+      }
+      else
+        {
+      sendToFamilyMedicError = "Failed to send email. Please try again or contact your family medic directly.";
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error sending assessment to family medic");
-            sendToFamilyMedicError = "An error occurred while sending to your family medic. Please try again.";
-        }
+       sendToFamilyMedicError = "An error occurred while sending to your family medic. Please try again.";
+      }
         finally
-        {
-            isSendingToFamilyMedic = false;
+    {
+   isSendingToFamilyMedic = false;
         }
     }
 
